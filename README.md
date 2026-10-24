@@ -17,7 +17,10 @@ The targeted regression suite was run on Rust 1.99.0, with a separately selected
 nightly for portable SIMD. This is not a certification of the entire collection
 on Rust 1.96 or the legacy CI toolchain, Rust 1.95.0.
 
-Works with Claude Code, Cursor, Windsurf, Copilot, Codex, Aider, Zed, Amp, Cline, and pretty much any other agent that supports skills.
+The entry point is `SKILL.md`, with supporting material in `rules/`. Installation
+and invocation depend on your agent; see the CLI's
+[supported agents](https://github.com/vercel-labs/skills/blob/main/docs/agents.md)
+for its current integration list.
 
 ## Why
 
@@ -28,38 +31,49 @@ a priority label or a passing test does not establish safety or performance.
 
 ## Install this corrected edition
 
+Use the [Skills CLI](https://github.com/vercel-labs/skills) from your project's
+directory. It requires Node.js 22.20 or later and npm/npx:
+
 ```bash
-npx add-skill rtmachines/rust-skills
+npx skills add rtmachines/rust-skills --skill rust-skills
 ```
 
-Alternatively, point your agent at this directory's [SKILL.md](SKILL.md), or copy
-the directory into a skill location supported by your agent. Keep `rules/`
-alongside `SKILL.md`. Publishing this fork does not install it into any agent.
+In interactive use, select the target agents when prompted; inside an agent,
+the CLI may select that agent automatically. Installation is project-scoped by
+default; add `--global` for your user account or `--agent` to choose explicitly:
+
+```bash
+# Codex, current project
+npx skills add rtmachines/rust-skills --skill rust-skills --agent codex
+
+# Claude Code, all projects for this user
+npx skills add rtmachines/rust-skills --skill rust-skills --agent claude-code --global
+
+# Inspect the skill available in this fork without installing it
+npx skills add rtmachines/rust-skills --list
+```
+
+Use `--copy` if symlinks are unsuitable for your setup. See the
+[CLI reference](https://github.com/vercel-labs/skills/blob/main/docs/commands.md)
+for the complete options. The older `npx add-skill` interface is deprecated;
+these instructions use `npx skills add`.
 
 The original project is [leonardomso/rust-skills](https://github.com/leonardomso/rust-skills).
 Installing from the original project does not include this fork's corrections.
 
 ## How to use it
 
-After installing, just ask your agent:
+After installation, select `rust-skills` using your agent's skill picker or
+invocation syntax. For example, ask:
 
-```
-/rust-skills review this function
-```
-
-```
-/rust-skills is my error handling idiomatic?
+```text
+Use the rust-skills skill to review this function. Read the relevant rule files,
+check the project's Rust edition and MSRV, and explain any applicable exceptions.
 ```
 
-```
-/rust-skills check for memory issues
-```
-
-```
-/rust-skills is this unsafe block sound?
-```
-
-The agent loads the relevant rules and applies them to your code.
+Some agents expose `/rust-skills`; others use a picker or a different prefix.
+When using a manual checkout, give the agent the path to `rust-skills/SKILL.md`
+and access to its sibling `rules/` directory.
 
 ## See it in action
 
@@ -116,6 +130,7 @@ fn first_word(s: &str) -> Option<&str> {
 | **Anti-patterns** | 15 | Common mistakes and how to fix them |
 
 Each rule has:
+
 - Why it matters
 - A bad code example
 - A good code example
@@ -126,128 +141,49 @@ Each rule has:
 The design is built for low token cost and easy auditing:
 
 - **[`SKILL.md`](./SKILL.md)** is a lightweight index — every rule listed as a one-line summary, grouped by category, with a link to its file. The agent reads this first.
-- **[`rules/`](./rules)** holds one Markdown file per rule (`<prefix>-<name>.md`). The agent opens only the handful relevant to your code instead of loading all 218 — progressive disclosure keeps context small.
+- **[`rules/`](./rules)** holds one Markdown file per rule (`<prefix>-<name>.md`). The agent can open the subset relevant to your code instead of loading all 265 rules.
 - **Prefixes** (`own-`, `err-`, `unsafe-`, `async-`, …) map directly to categories, so an agent reviewing async code can pull just `async-`, `conc-`, and `own-` rules.
 
-`CLAUDE.md` and `AGENTS.md` are symlinks to `SKILL.md`, so the same content works across agent conventions.
+Git stores `CLAUDE.md` and `AGENTS.md` as symlinks to `SKILL.md`. If your checkout
+does not preserve symlinks, open `SKILL.md` directly. Keep the directory layout
+intact so its relative links to `rules/` resolve.
 
-## Manual install
+## Manual checkout
 
-If `add-skill` doesn't work for your setup, here's how to install manually:
-
-<details>
-<summary><b>Claude Code</b></summary>
-
-Global (applies to all projects):
-```bash
-git clone https://github.com/leonardomso/rust-skills.git ~/.claude/skills/rust-skills
-```
-
-Or just for one project:
-```bash
-git clone https://github.com/leonardomso/rust-skills.git .claude/skills/rust-skills
-```
-</details>
-
-<details>
-<summary><b>OpenCode</b></summary>
+Clone the complete corrected repository:
 
 ```bash
-git clone https://github.com/leonardomso/rust-skills.git .opencode/skills/rust-skills
+git clone --branch master https://github.com/rtmachines/rust-skills.git rust-skills
 ```
-</details>
 
-<details>
-<summary><b>Cursor</b></summary>
+Place that directory in a skill location supported by your agent, or configure
+the agent to read `rust-skills/SKILL.md` from the checkout. Preserve at least:
+
+```text
+rust-skills/
+  SKILL.md
+  rules/
+    own-borrow-over-clone.md
+    ...
+```
+
+`SKILL.md` is an index: copying it alone into `AGENTS.md`, `.cursorrules`, or
+another instruction file omits the linked rule files. For an agent that reads
+project instruction files, add a reference to the complete checkout instead of
+replacing the project's existing instructions. For example, with the cloned
+directory inside the project:
+
+```text
+For Rust work, read rust-skills/SKILL.md and the relevant files under
+rust-skills/rules/. Apply each rule in the context of this project's edition,
+MSRV, dependencies and requirements.
+```
+
+To update an unmodified manual checkout from this fork:
 
 ```bash
-git clone https://github.com/leonardomso/rust-skills.git .cursor/skills/rust-skills
+git -C rust-skills pull --ff-only
 ```
-
-Or just grab the skill file:
-```bash
-curl -o .cursorrules https://raw.githubusercontent.com/leonardomso/rust-skills/master/SKILL.md
-```
-</details>
-
-<details>
-<summary><b>Windsurf</b></summary>
-
-```bash
-mkdir -p .windsurf/rules
-curl -o .windsurf/rules/rust-skills.md https://raw.githubusercontent.com/leonardomso/rust-skills/master/SKILL.md
-```
-</details>
-
-<details>
-<summary><b>OpenAI Codex</b></summary>
-
-```bash
-git clone https://github.com/leonardomso/rust-skills.git .codex/skills/rust-skills
-```
-
-Or use the AGENTS.md standard:
-```bash
-curl -o AGENTS.md https://raw.githubusercontent.com/leonardomso/rust-skills/master/SKILL.md
-```
-</details>
-
-<details>
-<summary><b>GitHub Copilot</b></summary>
-
-```bash
-mkdir -p .github
-curl -o .github/copilot-instructions.md https://raw.githubusercontent.com/leonardomso/rust-skills/master/SKILL.md
-```
-</details>
-
-<details>
-<summary><b>Aider</b></summary>
-
-Add to `.aider.conf.yml`:
-```yaml
-read: path/to/rust-skills/SKILL.md
-```
-
-Or pass it directly:
-```bash
-aider --read path/to/rust-skills/SKILL.md
-```
-</details>
-
-<details>
-<summary><b>Zed</b></summary>
-
-```bash
-curl -o AGENTS.md https://raw.githubusercontent.com/leonardomso/rust-skills/master/SKILL.md
-```
-</details>
-
-<details>
-<summary><b>Amp</b></summary>
-
-```bash
-git clone https://github.com/leonardomso/rust-skills.git .agents/skills/rust-skills
-```
-</details>
-
-<details>
-<summary><b>Cline / Roo Code</b></summary>
-
-```bash
-mkdir -p .clinerules
-curl -o .clinerules/rust-skills.md https://raw.githubusercontent.com/leonardomso/rust-skills/master/SKILL.md
-```
-</details>
-
-<details>
-<summary><b>Other agents (AGENTS.md)</b></summary>
-
-If your agent supports the [AGENTS.md](https://agents.md) standard:
-```bash
-curl -o AGENTS.md https://raw.githubusercontent.com/leonardomso/rust-skills/master/SKILL.md
-```
-</details>
 
 ## All rules
 
@@ -255,7 +191,7 @@ See [SKILL.md](./SKILL.md) for the full list with links to each rule file.
 
 ## Sources & attribution
 
-These rules are an independent synthesis of official Rust guidance, well-known books, and patterns drawn from widely-used open-source crates. They are not affiliated with or endorsed by the Rust project or any crate author. The text and code examples are original summaries — no substantial content is copied from the sources below.
+This fork builds on [leonardomso/rust-skills](https://github.com/leonardomso/rust-skills) and preserves its attribution and MIT license. The original collection summarizes official Rust guidance, books and patterns from open-source crates; this fork adds the corrections documented in [LOCAL_CHANGES.md](LOCAL_CHANGES.md). Neither the original project nor this fork is endorsed by the Rust project or the authors of the referenced crates.
 
 **Official Rust documentation**
 - [The Rust Reference](https://doc.rust-lang.org/reference/)
@@ -282,12 +218,13 @@ This project is MIT-licensed. Referenced upstream materials remain under their o
 
 ## Contributing
 
-PRs welcome. To add or change a rule:
+Open issues and pull requests against [rtmachines/rust-skills](https://github.com/rtmachines/rust-skills). See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow. To add or change a rule:
 
 1. Create `rules/<prefix>-<name>.md` using a `kebab-case` id with an existing category prefix (`own-`, `err-`, `mem-`, …).
 2. Follow the format of existing rules: a `>` one-line summary, then `## Why It Matters`, `## Bad`, `## Good`, and `## See Also` (with links that resolve).
-3. Make sure code examples compile on current stable Rust.
-4. Add the rule to the index in `SKILL.md` (Quick Reference list + the category count) so it stays in sync.
+3. Verify changed examples with their documented edition, toolchain and dependency versions. Label nightly-only examples and fragments that need additional context.
+4. Run `python checks/gen_index.py` to regenerate the index, then `python checks/validate.py` and `python checks/gen_index.py --check`. Do not hand-edit the generated index.
+5. Run the relevant [regression checks](checks/regressions/README.md) for code changes and record any verification limits.
 
 ````markdown
 # prefix-rule-name
