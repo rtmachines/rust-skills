@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-`Debug` (`{:?}`) is for developers: logs, panic messages, test assertions, and `dbg!()`. It should always be derived and reflects internal structure. `Display` (`{}`) is for end users: CLI output, error messages surfaced to humans, and log fields meant to be read in production. `std::error::Error` requires `Display` so that error chains read naturally. Routing `Debug` output to users leaks implementation details; routing `Display` output to log frameworks loses structural information.
+`Debug` (`{:?}`) is for developers: logs, panic messages, test assertions, and `dbg!()`. Derive it when all fields are suitable for diagnostics; implement it manually to redact secrets or omit unsuitable details. Private fields are still included by the derive. `Display` (`{}`) is for end users: CLI output, error messages surfaced to humans, and log fields meant to be read in production. `std::error::Error` requires `Display` so that error chains read naturally. Routing `Debug` output to users can expose implementation details; choose either format deliberately for the audience.
 
 ## Bad
 
@@ -64,11 +64,11 @@ fn main() {
 
 | Trait | Format | Audience | How to implement |
 |-------|--------|----------|-----------------|
-| `Debug` | `{:?}` / `{:#?}` | Developers, logs | `#[derive(Debug)]` (almost always) |
+| `Debug` | `{:?}` / `{:#?}` | Developers, logs | Derive for safe-to-log fields; manually redact sensitive data |
 | `Display` | `{}` | End users, error messages | Hand-write to describe the condition clearly |
 
 - Never derive `Display` — it must be intentionally written.
-- `#[derive(Debug)]` on every public type (API Guidelines C-DEBUG).
+- Implement `Debug` for public types (API Guidelines C-DEBUG); this does not require deriving it. See the redacted `Password` implementation in [api-common-traits](api-common-traits.md).
 - If your error type implements `std::error::Error`, its `Display` output becomes the human-readable error message that propagates through `anyhow::Context` and similar.
 - The `{:#?}` pretty-print form is still `Debug`; use it in tests for readable assertion output, not in user-facing code.
 

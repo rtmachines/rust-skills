@@ -6,7 +6,7 @@
 
 Doc examples should model best practices. Using `.unwrap()` teaches users to ignore errors, while `?` demonstrates proper error propagation. Examples with `?` also fail the doctest if an error occurs, catching bugs in documentation.
 
-Rust doctests wrap examples in a function that returns `Result<(), E>` by default when you use `?`, making this pattern easy to adopt.
+Using `?` alone does not change the default `()` return type of a doctest wrapper. Supply an explicit `fn main() -> Result<(), E>` or a final hidden `Ok::<(), E>(())` expression so rustdoc can infer the error-returning context.
 
 ## Bad
 
@@ -82,6 +82,7 @@ Rust wraps doc examples in a function. You can make this explicit:
 /// # Examples
 ///
 /// ```
+/// # use my_crate::parse_config;
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let value = parse_config("key=value")?;
 /// assert_eq!(value.key, "value");
@@ -90,7 +91,7 @@ Rust wraps doc examples in a function. You can make this explicit:
 /// ```
 ```
 
-Or use the implicit wrapper (Rust 2021+):
+Or let rustdoc infer the wrapper return type from a typed final `Ok` (this is not specific to the 2021 edition):
 
 ```rust
 /// # Examples

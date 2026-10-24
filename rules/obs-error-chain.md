@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Logging only the top-level `Display` of an error silently drops the underlying cause chain — you see "request failed" but not *why*. The two common fixes are: use `?` format (`error = ?err`) to capture `Debug` output including the chain, or use `{:#}` on an `anyhow::Error` which formats the full cause chain. The second hazard is the log-and-return anti-pattern: logging the error at every propagation layer records the same failure multiple times with different amounts of context, polluting aggregators. Log once, at the boundary that *handles* the error; everywhere else, propagate with `?` and optionally add context.
+Logging only the top-level `Display` of an error silently drops the underlying cause chain — you see "request failed" but not *why*. For `anyhow::Error`, `{:#}` formats the cause chain. For a general `std::error::Error`, walk `source()` explicitly or use a reporter that does so: `error = ?err` uses that type's `Debug` implementation and does not automatically traverse sources. The second hazard is the log-and-return anti-pattern: logging the error at every propagation layer records the same failure multiple times with different amounts of context, polluting aggregators. Log once, at the boundary that *handles* the error; everywhere else, propagate with `?` and optionally add context.
 
 ## Bad
 
@@ -79,7 +79,7 @@ fn process(_data: Vec<u8>) {}
 
 ## Key Points
 
-- **`error = ?err`**: uses `Debug` — prints the error and its `source()` chain for types that implement it.
+- **`error = ?err`**: uses `Debug`; a `source()` implementation alone does not make the chain appear. Check the concrete error type or traverse sources explicitly.
 - **`format!("{err:#}")`** or `%format!(...)`: `anyhow::Error`'s alternate Display walks the full chain with `: ` separators.
 - **Propagate, don't log**: use `?` and `.context()` / `.with_context()` at intermediate layers; log at the single handling boundary.
 - If you *must* log at a non-handling layer (e.g., background task that discards the error), use `warn!` not `error!` to signal it was absorbed.

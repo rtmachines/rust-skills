@@ -10,7 +10,7 @@ description: >
 license: MIT
 metadata:
   author: leonardomso
-  version: "1.5.1"
+  version: "1.5.1+local.1"
   sources:
     - Rust API Guidelines
     - Rust Performance Book
@@ -21,7 +21,18 @@ metadata:
 
 # Rust Best Practices
 
-Comprehensive guide for writing high-quality, idiomatic, and highly optimized Rust code. Contains 265 rules across 26 categories, prioritized by impact to guide LLMs in code generation and refactoring. Current for Rust 1.96 (2024 edition).
+Guide to Rust patterns and their tradeoffs. Contains 265 rules across 26 categories.
+This corrected local edition is based on upstream commit
+`fd2a861ab0406a4ac536a55274d14ea6fd1ca9c9`; see [LOCAL_CHANGES.md](LOCAL_CHANGES.md)
+for the corrections and verification limits. Examples use edition 2024 unless
+stated otherwise. Check the target project's edition, MSRV, dependency versions,
+enabled features and invariants before applying a rule.
+
+Priority labels help navigation; they do not override a project's requirements.
+Read the complete rule before applying its one-line summary. Some blocks are
+fragments with omitted domain-specific helpers, alternative implementations, or
+explicitly labeled pseudocode. Treat safety contracts as obligations to prove,
+and performance advice as a hypothesis to measure on the actual workload.
 
 ## When to Apply
 
@@ -107,7 +118,7 @@ Reference these guidelines when:
 - [`mem-arrayvec`](rules/mem-arrayvec.md) - Use `ArrayVec<T, N>` for fixed-capacity collections that never heap-allocate
 - [`mem-box-large-variant`](rules/mem-box-large-variant.md) - Box large enum variants to reduce overall enum size
 - [`mem-boxed-slice`](rules/mem-boxed-slice.md) - Use `Box<[T]>` instead of `Vec<T>` for fixed-size heap data
-- [`mem-thinvec`](rules/mem-thinvec.md) - Use `ThinVec<T>` for nullable collections with minimal overhead
+- [`mem-thinvec`](rules/mem-thinvec.md) - Consider `ThinVec<T>` when many collection values make metadata size important
 - [`mem-clone-from`](rules/mem-clone-from.md) - Use `clone_from()` to reuse allocations when repeatedly cloning
 - [`mem-reuse-collections`](rules/mem-reuse-collections.md) - Clear and reuse collections instead of creating new ones in loops
 - [`mem-avoid-format`](rules/mem-avoid-format.md) - Avoid `format!()` when string literals work
@@ -153,7 +164,7 @@ Reference these guidelines when:
 ### 6. Async/Await (HIGH)
 
 - [`async-tokio-runtime`](rules/async-tokio-runtime.md) - Configure Tokio runtime appropriately for your workload
-- [`async-no-lock-await`](rules/async-no-lock-await.md) - Never hold `Mutex`/`RwLock` across `.await`
+- [`async-no-lock-await`](rules/async-no-lock-await.md) - Avoid blocking guards across await; choose async lock scope to preserve the protected operation
 - [`async-spawn-blocking`](rules/async-spawn-blocking.md) - Use `spawn_blocking` for CPU-intensive work
 - [`async-tokio-fs`](rules/async-tokio-fs.md) - Use `tokio::fs` instead of `std::fs` in async code
 - [`async-cancellation-token`](rules/async-cancellation-token.md) - Use `CancellationToken` for graceful shutdown and task cancellation
@@ -166,9 +177,9 @@ Reference these guidelines when:
 - [`async-watch-latest`](rules/async-watch-latest.md) - Use `watch` channel for sharing the latest value with multiple observers
 - [`async-oneshot-response`](rules/async-oneshot-response.md) - Use `oneshot` channel for request-response patterns
 - [`async-joinset-structured`](rules/async-joinset-structured.md) - Use `JoinSet` for managing dynamic collections of spawned tasks
-- [`async-clone-before-await`](rules/async-clone-before-await.md) - Clone Arc/Rc data before await points to avoid holding references across suspension
-- [`async-fn-in-trait`](rules/async-fn-in-trait.md) - Use native `async fn` in traits (stable 1.75) instead of the `async_trait` macro
-- [`async-async-fn-bounds`](rules/async-async-fn-bounds.md) - Use `AsyncFn`/`AsyncFnMut`/`AsyncFnOnce` bounds instead of `F: Fn() -> Fut, Fut: Future`
+- [`async-clone-before-await`](rules/async-clone-before-await.md) - Clone shared handles for additional ownership; check lifetime and Send independently
+- [`async-fn-in-trait`](rules/async-fn-in-trait.md) - Prefer native `async fn` in traits for static dispatch; use explicit boxing when dynamic dispatch is required
+- [`async-async-fn-bounds`](rules/async-async-fn-bounds.md) - Use `AsyncFn*` for lending async callbacks; keep explicit future bounds when that contract fits
 - [`async-cancel-safety`](rules/async-cancel-safety.md) - Ensure futures used in `tokio::select!` branches are cancellation-safe
 
 ### 7. Concurrency (HIGH)
@@ -185,7 +196,7 @@ Reference these guidelines when:
 - [`opt-inline-never-cold`](rules/opt-inline-never-cold.md) - Use `#[inline(never)]` and `#[cold]` for error paths and rarely-executed code
 - [`opt-cold-unlikely`](rules/opt-cold-unlikely.md) - Mark unlikely code paths with `#[cold]` to help compiler optimization
 - [`opt-likely-hint`](rules/opt-likely-hint.md) - Use code structure to hint at likely branches; use intrinsics on nightly
-- [`opt-lto-release`](rules/opt-lto-release.md) - Enable LTO in release builds
+- [`opt-lto-release`](rules/opt-lto-release.md) - Measure LTO for release builds and choose its scope deliberately
 - [`opt-codegen-units`](rules/opt-codegen-units.md) - Set `codegen-units = 1` for maximum optimization in release builds
 - [`opt-pgo-profile`](rules/opt-pgo-profile.md) - Use Profile-Guided Optimization (PGO) for maximum performance
 - [`opt-target-cpu`](rules/opt-target-cpu.md) - Use `target-cpu=native` for maximum performance on known deployment targets
@@ -197,7 +208,7 @@ Reference these guidelines when:
 
 - [`num-overflow-explicit`](rules/num-overflow-explicit.md) - Handle integer overflow explicitly: `checked_`/`saturating_`/`wrapping_`/`overflowing_`
 - [`num-cast-try-from`](rules/num-cast-try-from.md) - Avoid `as` for narrowing casts; use `From` for widening and `TryFrom` for narrowing
-- [`num-float-compare`](rules/num-float-compare.md) - Don't compare floats with `==`; use a tolerance, and `total_cmp` for ordering
+- [`num-float-compare`](rules/num-float-compare.md) - Choose numeric, approximate or bitwise float equality deliberately; use `total_cmp` for a defined total order
 - [`num-saturating-clamp`](rules/num-saturating-clamp.md) - Bound values with `clamp` and saturating arithmetic
 - [`num-nonzero`](rules/num-nonzero.md) - Use `NonZero*` types to forbid zero and unlock the niche optimization
 
@@ -318,7 +329,7 @@ Reference these guidelines when:
 - [`test-should-panic`](rules/test-should-panic.md) - Use `#[should_panic]` to test that code panics as expected
 - [`test-criterion-bench`](rules/test-criterion-bench.md) - Use `criterion` for benchmarking
 - [`test-doctest-examples`](rules/test-doctest-examples.md) - Keep documentation examples as executable doctests
-- [`test-loom-concurrency`](rules/test-loom-concurrency.md) - Use `loom` to exhaustively test lock-free and concurrent code
+- [`test-loom-concurrency`](rules/test-loom-concurrency.md) - Use `loom` to explore bounded models of lock-free and concurrent code
 - [`test-snapshot-testing`](rules/test-snapshot-testing.md) - Use snapshot testing (insta) for complex or serialized output
 
 ### 21. Documentation (MEDIUM)
@@ -369,7 +380,7 @@ Reference these guidelines when:
 - [`proj-flat-small`](rules/proj-flat-small.md) - Keep small projects flat
 - [`proj-mod-rs-dir`](rules/proj-mod-rs-dir.md) - Use mod.rs for multi-file modules
 - [`proj-pub-crate-internal`](rules/proj-pub-crate-internal.md) - Use pub(crate) for internal APIs
-- [`proj-pub-super-parent`](rules/proj-pub-super-parent.md) - Use pub(super) for parent-only visibility
+- [`proj-pub-super-parent`](rules/proj-pub-super-parent.md) - Use `pub(super)` for visibility within the parent module and its descendants
 - [`proj-pub-use-reexport`](rules/proj-pub-use-reexport.md) - Use pub use for clean public API
 - [`proj-prelude-module`](rules/proj-prelude-module.md) - Create prelude module for common imports
 - [`proj-bin-dir`](rules/proj-bin-dir.md) - Put multiple binaries in src/bin/
@@ -400,10 +411,10 @@ Reference these guidelines when:
 - [`anti-unwrap-abuse`](rules/anti-unwrap-abuse.md) - Don't use `.unwrap()` in production code
 - [`anti-expect-lazy`](rules/anti-expect-lazy.md) - Don't use expect for recoverable errors
 - [`anti-clone-excessive`](rules/anti-clone-excessive.md) - Don't clone when borrowing works
-- [`anti-lock-across-await`](rules/anti-lock-across-await.md) - Don't hold locks across await points
+- [`anti-lock-across-await`](rules/anti-lock-across-await.md) - Avoid synchronous guards across await; keep async locks for the scope required by the invariant
 - [`anti-string-for-str`](rules/anti-string-for-str.md) - Don't accept &String when &str works
 - [`anti-vec-for-slice`](rules/anti-vec-for-slice.md) - Don't accept &Vec<T> when &[T] works
-- [`anti-index-over-iter`](rules/anti-index-over-iter.md) - Don't use indexing when iterators work
+- [`anti-index-over-iter`](rules/anti-index-over-iter.md) - Prefer iterators when they make traversal clearer; measure performance differences
 - [`anti-panic-expected`](rules/anti-panic-expected.md) - Don't panic on expected or recoverable errors
 - [`anti-empty-catch`](rules/anti-empty-catch.md) - Don't silently ignore errors
 - [`anti-over-abstraction`](rules/anti-over-abstraction.md) - Don't over-abstract with excessive generics
@@ -417,13 +428,17 @@ Reference these guidelines when:
 
 ## Recommended Cargo.toml Settings
 
+Start with Cargo defaults, then select measured changes for your workload.
+These are optional tuning examples, not a universal profile. In particular,
+`panic = "abort"` changes failure behavior and does not run unwind cleanup.
+
 ```toml
 [profile.release]
 opt-level = 3
-lto = "fat"
-codegen-units = 1
-panic = "abort"
-strip = true
+# lto = "thin"       # Measure against defaults and "fat".
+# codegen-units = 1   # May change build time and runtime performance.
+# panic = "abort"    # Only when process termination without unwinding is intended.
+# strip = true       # Only when removed symbols/debug data are not required.
 
 [profile.bench]
 inherits = "release"
@@ -435,7 +450,7 @@ opt-level = 0
 debug = true
 
 [profile.dev.package."*"]
-opt-level = 3  # Optimize dependencies in dev
+# opt-level = 3  # Optional: benchmark its effect on development iteration time.
 ```
 
 ---
@@ -444,10 +459,10 @@ opt-level = 3  # Optimize dependencies in dev
 
 This skill provides rule identifiers for quick reference. When generating or reviewing Rust code:
 
-1. **Check relevant category** based on task type
-2. **Apply rules** with matching prefix
-3. **Prioritize** CRITICAL > HIGH > MEDIUM > LOW
-4. **Read rule files** in `rules/` for detailed examples
+1. **Establish context:** edition, MSRV, dependency versions and required behavior.
+2. **Find relevant categories** based on the task and use priority labels to navigate.
+3. **Read the complete rule files** in `rules/`, including their exceptions and examples.
+4. **Apply only applicable advice** and verify behavior, safety obligations and any performance claims.
 
 ### Rule Application by Task
 

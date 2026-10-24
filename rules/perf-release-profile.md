@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-The default release profile prioritizes compile speed over runtime performance. For production binaries, tuning the release profile can yield significant performance improvements (10-40% in some cases) at the cost of longer compile times.
+The default release profile already optimizes runtime code. Tuning LTO and codegen units may improve a particular binary at the cost of build time or memory; compare representative workloads before choosing a profile.
 
 ## Default Profile
 
@@ -36,7 +36,7 @@ opt-level = 3
 | Option | Values | Effect |
 |--------|--------|--------|
 | `opt-level` | 0-3, "s", "z" | Optimization level |
-| `lto` | false, "thin", "fat" | Link-time optimization |
+| `lto` | false, "off", "thin", "fat" | LTO scope and strategy |
 | `codegen-units` | 1-256 | Parallel compilation units |
 | `panic` | "unwind", "abort" | Panic behavior |
 | `strip` | true, false, "symbols", "debuginfo" | Binary stripping |
@@ -55,11 +55,12 @@ opt-level = 3
 
 ## LTO Options
 
-| Option | Compile Time | Performance | Binary Size |
-|--------|--------------|-------------|-------------|
-| `false` | Fast | Baseline | Larger |
-| `"thin"` | Medium | Good | Smaller |
-| `"fat"` | Slow | Best | Smallest |
+| Option | Behavior | Trade-off |
+|--------|----------|-----------|
+| `false` | Local thin LTO across codegen units, except when codegen-units = 1 or opt-level = 0 | Cargo default; no cross-crate LTO |
+| `"off"` | Disable LTO | Useful baseline when measuring |
+| `"thin"` | Cross-crate thin LTO | Often cheaper to build than fat LTO; measure the binary |
+| `"fat"` | Cross-crate fat LTO | More build work; no universal speed or size ranking |
 
 ## Custom Profiles
 
@@ -138,8 +139,8 @@ codegen-units = 1
 
 # Override for specific package
 [profile.release.package.fast-compile-lib]
-lto = false
 codegen-units = 16
+# lto is not allowed in package overrides; choose it in the top-level profile.
 ```
 
 ## See Also

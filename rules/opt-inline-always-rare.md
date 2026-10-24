@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-`#[inline(always)]` forces the compiler to inline a function regardless of heuristics. Overuse increases binary size, hurts instruction cache, and can slow down code. The compiler is usually smarter about inlining than humans. Reserve this for measured hot paths where benchmarks prove a benefit.
+`#[inline(always)]` strongly suggests inlining; inline attributes are compiler hints, not language-level guarantees. Excessive inlining can increase binary size and hurt instruction-cache behavior. Reserve this hint for hot paths where measurements and generated code justify it.
 
 ## Bad
 
@@ -43,7 +43,7 @@ pub fn calculate_tax(amount: f64) -> f64 {
 // Only force inline for proven hot paths
 impl Hasher for MyHasher {
     // Hasher::write is called millions of times in tight loops
-    // Profiling showed 15% improvement from forced inlining
+    // Keep the hint only if this workload's benchmark shows a benefit.
     #[inline(always)]
     fn write(&mut self, bytes: &[u8]) {
         // Very small, very hot
@@ -87,11 +87,11 @@ fn add_simd(a: &[f32], b: &[f32], out: &mut [f32]) {
 #[inline]
 fn suggested_inline(x: i32) -> i32 { x + 1 }
 
-// #[inline(always)] - force inline (almost always)
+// #[inline(always)] - strongly suggest inlining; verify generated code
 #[inline(always)]
 fn force_inline(x: i32) -> i32 { x + 1 }
 
-// #[inline(never)] - prevent inlining (for profiling, code size)
+// #[inline(never)] - suggest avoiding inlining (for profiling, code size)
 #[inline(never)]
 fn no_inline(x: i32) -> i32 { x + 1 }
 
@@ -121,17 +121,18 @@ fn bench_with_inline(c: &mut Criterion) {
 ## Generic Functions
 
 ```rust
-// Generic functions across crate boundaries often need #[inline]
-// Because the generic code is compiled in the calling crate
+// Generic bodies are available for downstream monomorphization even without
+// #[inline]. The attribute can still influence optimization heuristics.
 
 // In library crate:
-#[inline]  // Allow inlining in downstream crates
+use std::fmt::Display;
+#[inline]  // Optional hint, not a prerequisite for this generic body
 pub fn generic_function<T: Display>(x: T) {
     println!("{}", x);
 }
 
-// Without #[inline], the generic function can't be inlined
-// across crate boundaries even if beneficial
+// This generic function can be inlined across crates without the attribute
+// or LTO. That possibility does not guarantee any particular optimization.
 ```
 
 ## See Also

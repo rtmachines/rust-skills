@@ -28,19 +28,29 @@ unsafe extern "C" {
     pub unsafe fn strlen(s: *const std::ffi::c_char) -> usize;
 
     // `memcpy` is unsafe: caller must ensure non-overlapping, valid regions.
-    pub unsafe fn memcpy(dst: *mut u8, src: *const u8, n: usize) -> *mut u8;
+    pub unsafe fn memcpy(
+        dst: *mut std::ffi::c_void,
+        src: *const std::ffi::c_void,
+        n: usize,
+    ) -> *mut std::ffi::c_void;
 
     // A function that is always safe to call (hypothetical pure query).
     pub safe fn rust_version_major() -> u32;
 
-    // Statics are unsafe to access unless you can guarantee no data races.
-    pub unsafe static errno: std::ffi::c_int;
+    // Hypothetical foreign library symbol; access needs its synchronization
+    // contract. Real C errno is not portably an ordinary external static.
+    pub unsafe static foreign_error_count: std::ffi::c_int;
 }
 
 // Call sites remain unchanged for `unsafe` items:
-fn copy_bytes(dst: *mut u8, src: *const u8, n: usize) {
-    // SAFETY: dst and src are non-overlapping, both valid for n bytes.
-    unsafe { memcpy(dst, src, n) };
+fn copy_bytes(dst: &mut [u8], src: &[u8]) {
+    assert_eq!(dst.len(), src.len());
+    if src.is_empty() {
+        return;
+    }
+    // SAFETY: the slices provide valid readable/writable regions of equal
+    // length; the exclusive destination borrow prevents overlap with src.
+    unsafe { memcpy(dst.as_mut_ptr().cast(), src.as_ptr().cast(), src.len()) };
 }
 
 // Call sites for `safe` items need no unsafe block:

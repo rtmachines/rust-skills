@@ -4,14 +4,14 @@
 
 ## Why It Matters
 
-Miri is the only tool that *dynamically* detects undefined behavior in Rust programs at test time. It catches out-of-bounds memory accesses, use-after-free, reads of uninitialized memory, invalid pointer provenance, data races in `unsafe` multithreaded code, and violations of the Stacked Borrows / Tree Borrows aliasing models. The Rust standard library, tokio, serde, and many foundational crates all run Miri in CI before merging changes that touch unsafe code.
+Miri interprets Rust tests and detects many classes of undefined behavior in the executions it explores: invalid memory accesses, uninitialized reads, data races, and violations of the selected pointer/aliasing model. It complements code review and tools such as sanitizers, which also dynamically detect classes of memory and concurrency bugs.
 
-Static analysis and code review can miss subtle UB that only manifests at specific memory layouts; Miri's interpreted execution catches it unconditionally.
+Passing Miri is not a proof of soundness. Results depend on executed paths, inputs, schedules, the selected model and supported operations. A test using only safe code can still expose unsoundness in a dependency's safe API.
 
 ## Bad
 
 ```yaml
-# CI that tests but never runs Miri — unsafe code ships unverified.
+# Ordinary tests alone do not check the unsafe implementation under Miri.
 - name: Test
   run: cargo test --all-features
 ```
@@ -46,17 +46,18 @@ jobs:
 ## Key Points
 
 - **Nightly only**: Miri requires a nightly toolchain. Pin a specific nightly date in `rust-toolchain.toml` if you need reproducible CI.
-- **Slow**: Miri interprets rather than compiles, so test suites run 100–1000× slower than normal. Run Miri on a reduced set of tests or on a separate slower CI job if the full suite is prohibitive.
-- **`MIRIFLAGS`**: `-Zmiri-strict-provenance` enables stricter pointer provenance checks, catching casts that violate the provenance model. Add `-Zmiri-tree-borrows` to opt into the newer Tree Borrows model.
-- **Stacked Borrows**: Miri's default aliasing model. It catches violations of Rust's borrow rules at the pointer level — invaluable for raw-pointer and FFI code.
+- **Cost**: interpretation can be much slower than native tests. Measure the suite's cost and select targeted tests when needed; no universal slowdown factor applies.
+- **`MIRIFLAGS` and models**: check supported flags and the default aliasing model for the pinned nightly. Strict provenance can reject unsupported pointer constructions; Stacked Borrows and Tree Borrows model different aliasing rules. A result is evidence under the model used, not a complete language-level proof.
 - **Setup command**: `cargo miri setup` pre-builds the Miri sysroot so the first test run is not cold. Run it once per CI cache key.
-- Only crates with `unsafe` blocks need Miri coverage. Pure-safe crates gain nothing from it.
+- Test unsafe abstractions through their safe APIs as well. A crate without its own unsafe blocks may exercise unsafe standard-library, dependency or generated code.
 
 ## When It's Acceptable to Skip
 
-- Crates with zero `unsafe` code (safe-only crates get no benefit).
-- Generated code or proc-macro output you do not control (audit the generator instead).
+- Tests whose relevant operations are unsupported by the selected Miri version; isolate and test supported parts, and record what remains unchecked.
+- Generated code still merits testing when it participates in the safety boundary; auditing the generator is complementary.
 - Very large integration tests that make Miri impractical — run a targeted unit-test subset instead.
+
+Choose supported feature combinations; `--all-features` is appropriate only when those features work together. Record the nightly, flags, test subset and remaining gaps. See the [Miri documentation](https://github.com/rust-lang/miri) for current support and limitations.
 
 ## See Also
 

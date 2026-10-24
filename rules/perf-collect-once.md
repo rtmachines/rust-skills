@@ -4,12 +4,12 @@
 
 ## Why It Matters
 
-Each `.collect()` allocates a new collection. Chaining multiple operations with intermediate collections wastes memory and CPU cycles. Keep iterator chains lazy and collect only once at the end.
+Each `.collect()` materializes a collection and may allocate. Chaining multiple operations with intermediate collections wastes memory and CPU cycles. Keep iterator chains lazy and collect only once at the end.
 
 ## Bad
 
 ```rust
-// Three allocations, three passes
+// Three collecting stages and three passes; allocations depend on reuse
 fn process_users(users: Vec<User>) -> Vec<String> {
     let active: Vec<_> = users.into_iter()
         .filter(|u| u.is_active)
@@ -36,7 +36,7 @@ fn count_valid(items: &[Item]) -> usize {
 ## Good
 
 ```rust
-// One allocation, one pass
+// One collecting stage, one pass; an owning Vec iterator may reuse its buffer
 fn process_users(users: Vec<User>) -> Vec<String> {
     users.into_iter()
         .filter(|u| u.is_active)
@@ -95,8 +95,8 @@ sorted.sort_by_key(|x| x.priority);
 
 | Approach | Allocations | Passes | Memory |
 |----------|-------------|--------|--------|
-| Multiple `.collect()` | N | N | O(N × data) |
-| Single chain + `.collect()` | 1 | 1 | O(data) |
+| Multiple `.collect()` | Depends on reuse | N | Depends on which intermediates stay alive |
+| Single chain + `.collect()` | May reuse the source buffer | 1 | O(data) |
 | No `.collect()` (streaming) | 0 | 1 | O(1) |
 
 ## Pattern: Collect with Capacity
@@ -112,6 +112,8 @@ result.extend(
         .map(|x| x.clone())
 );
 ```
+
+A `Vec::IntoIter` pipeline can collect in place when the element layout and adapters support it. For example, several filter/map/collect stages over owned `Vec<i32>` may reuse the same allocation. This is an implementation optimization, not a stable allocation-count guarantee. These comparisons exclude allocations performed by the predicates or transformations themselves.
 
 ## See Also
 

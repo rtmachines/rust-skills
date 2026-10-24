@@ -29,14 +29,18 @@ undocumented_unsafe_blocks = "deny"
 ## Bad
 
 ```rust
-pub fn read_data(ptr: *const u8, len: usize) -> &[u8] {
+/// # Safety
+/// `ptr` and `len` must satisfy `slice::from_raw_parts` for lifetime `'a`.
+pub unsafe fn read_data<'a>(ptr: *const u8, len: usize) -> &'a [u8] {
     unsafe {
         std::slice::from_raw_parts(ptr, len)  // WARN: undocumented
     }
 }
 
 impl Buffer {
-    pub fn get_unchecked(&self, index: usize) -> &u8 {
+    /// # Safety
+    /// `index` must be less than `self.data.len()`.
+    pub unsafe fn get_unchecked(&self, index: usize) -> &u8 {
         unsafe { self.data.get_unchecked(index) }  // WARN
     }
 }
@@ -45,26 +49,42 @@ impl Buffer {
 ## Good
 
 ```rust
-pub fn read_data(ptr: *const u8, len: usize) -> &[u8] {
-    // SAFETY: Caller guarantees:
-    // - ptr is valid for reads of len bytes
-    // - ptr is properly aligned for u8
-    // - the memory is initialized
-    // - no mutable references exist to this memory
+/// Borrows bytes from an external allocation.
+///
+/// # Safety
+///
+/// `ptr` must be non-null and aligned, even when `len == 0`. The range must
+/// lie in one allocation, contain `len` initialized bytes, and have a size
+/// no greater than `isize::MAX`. For all of `'a`, that allocation must remain
+/// alive and these bytes must not be mutated. The caller chooses a lifetime
+/// that satisfies these obligations; a comment cannot enforce them in safe code.
+pub unsafe fn read_data<'a>(ptr: *const u8, len: usize) -> &'a [u8] {
+    // SAFETY: The caller upholds all from_raw_parts requirements for 'a.
     unsafe {
         std::slice::from_raw_parts(ptr, len)
     }
 }
 
+pub struct Buffer {
+    data: Vec<u8>,
+}
+
 impl Buffer {
-    pub fn get_unchecked(&self, index: usize) -> &u8 {
-        debug_assert!(index < self.len(), "index out of bounds");
-        // SAFETY: We verified index < len in debug builds.
-        // Callers must ensure index is within bounds.
+    /// Returns a byte, panicking if the index is out of bounds.
+    pub fn get(&self, index: usize) -> &u8 {
+        assert!(index < self.data.len(), "index out of bounds");
+        // SAFETY: The unconditional assertion proves index < data.len()
+        // in every build profile; the Vec remains borrowed for the result.
         unsafe { self.data.get_unchecked(index) }
     }
 }
 ```
+
+Prefer a slice parameter when external raw pointers are unnecessary. Likewise,
+`self.data.get(index)` or checked indexing is usually clearer than the manually
+checked unsafe access above. A `debug_assert!` alone cannot justify a safe wrapper:
+its check can disappear in release builds. Documentation does not impose unsafe
+caller obligations on a safe function.
 
 ## SAFETY Comment Format
 
@@ -93,9 +113,8 @@ let boxed = unsafe { Box::from_raw(ptr) };
 ### Unchecked Operations
 
 ```rust
-// SAFETY: We just checked that i < self.len() above.
-// The bounds check cannot be elided by the optimizer
-// because len() is not inlined.
+assert!(i < self.data.len(), "index out of bounds");
+// SAFETY: The unconditional check above proves the index is in bounds.
 unsafe { self.data.get_unchecked(i) }
 ```
 

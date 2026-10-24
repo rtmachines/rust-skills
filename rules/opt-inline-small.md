@@ -31,7 +31,7 @@ fn is_ascii_digit(b: u8) -> bool {
     b >= b'0' && b <= b'9'
 }
 
-// Now the compiler will inline this
+// This is a hint; inspect the result rather than assuming it is inlined.
 for byte in data {
     if is_ascii_digit(*byte) {  // Inlined, no call overhead
         count += 1;
@@ -111,7 +111,7 @@ fn write_line(&self, line: &[u8]) -> io::Result<()> {
 
 ```rust
 // Generic functions are already candidates for per-monomorphization inlining
-// But #[inline] helps ensure it across crates
+// #[inline] is an optional heuristic hint, not a requirement across crates
 
 #[inline]
 pub fn min<T: Ord>(a: T, b: T) -> T {
@@ -132,11 +132,10 @@ fn large_complex_function(data: &mut [u8]) {
 // DON'T assume inlining always helps - measure!
 // Sometimes the compiler makes better decisions
 
-// Cross-crate inlining requires #[inline] on each function
-// Without LTO, a function body is not available to other crates unless
-// it carries #[inline]. Within a single crate (or with LTO enabled),
-// the compiler may still inline `inner` transitively after inlining
-// `outer`, but this is not guaranteed — verify hot code with assembly.
+// For non-generic functions, #[inline] makes a body available to downstream
+// optimization without relying on LTO. Generic bodies are already available
+// for monomorphization. The compiler may also inline inner transitively while
+// compiling outer; none of these mechanisms guarantees a specific result.
 #[inline]
 fn outer() {
     inner();

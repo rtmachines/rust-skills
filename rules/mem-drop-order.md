@@ -70,14 +70,14 @@ Local variables drop in **reverse** declaration order, which is often what you w
 
 ```rust
 fn process() {
-    let conn = open_connection();   // dropped third (last to drop)
-    let txn  = begin_transaction(); // dropped second
-    let guard = acquire_lock();     // dropped first — WRONG if txn needs the lock
+    let conn = open_connection();   // dropped last
+    let guard = acquire_lock();     // acquired before constructing the transaction
+    let txn = begin_transaction();  // dropped before guard on early return/unwind
 
-    // fix: drop guard explicitly before txn and conn drop naturally
+    // Finish the transaction while the protecting lock is still held.
     do_work(&txn);
-    drop(guard); // lock released here
-    txn.commit(); // runs before conn closes
+    txn.commit(); // real fallible commit APIs must propagate/handle their error
+    drop(guard); // release only after the transaction has finished
 } // conn drops here
 # fn open_connection() -> () {}
 # fn begin_transaction() -> () {}

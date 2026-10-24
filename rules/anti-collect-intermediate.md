@@ -4,12 +4,12 @@
 
 ## Why It Matters
 
-Each `.collect()` allocates a new collection. Collecting intermediate results in a chain creates unnecessary allocations and prevents iterator fusion. Keep the chain lazy; collect only at the end.
+Each `.collect()` materializes a collection and may allocate. Collecting intermediate results in a chain can add allocations and separates what could be one traversal. Keep the chain lazy; collect only at the end.
 
 ## Bad
 
 ```rust
-// Three allocations, three passes
+// Three collecting stages and three passes; allocations depend on reuse
 fn process(data: Vec<i32>) -> Vec<i32> {
     let step1: Vec<_> = data.into_iter()
         .filter(|x| *x > 0)
@@ -44,7 +44,7 @@ fn sum_valid(items: &[Item]) -> i64 {
 ## Good
 
 ```rust
-// Single allocation, single pass
+// One collecting stage, one pass; Vec may reuse the input allocation
 fn process(data: Vec<i32>) -> Vec<i32> {
     data.into_iter()
         .filter(|x| *x > 0)
@@ -120,9 +120,11 @@ let vec: Vec<_> = valid_items(&items).collect();  // Collection when needed
 
 | Pattern | Allocations | Passes |
 |---------|-------------|--------|
-| `.collect()` each step | N | N |
-| Single chain, one `.collect()` | 1 | 1 |
+| `.collect()` each step | Depends on iterator/collection reuse | N |
+| Single chain, one `.collect()` | May reuse an owning Vec iterator | 1 |
 | No collection (streaming) | 0 | 1 |
+
+A `Vec::IntoIter` pipeline can collect in place when the element layout and adapters support it. For example, several filter/map/collect stages over owned `Vec<i32>` may reuse the same allocation. This is an implementation optimization, not a stable allocation-count guarantee. These comparisons exclude allocations performed by the predicates or transformations themselves.
 
 ## See Also
 

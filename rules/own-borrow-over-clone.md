@@ -77,13 +77,19 @@ let y = x;  // Copy, not clone - this is fine
 
 ## Evidence
 
-From ripgrep's codebase - uses `Cow` to avoid clones:
+Adapted from the `Cow` pattern in ripgrep (a simplified forward-slash path example):
 ```rust
+use std::borrow::Cow;
+
 // https://github.com/BurntSushi/ripgrep/blob/master/crates/globset/src/pathutil.rs
 pub(crate) fn file_name<'a>(path: &Cow<'a, [u8]>) -> Option<Cow<'a, [u8]>> {
+    if path.is_empty() || path.ends_with(b"/") {
+        return None;
+    }
+    let start = path.iter().rposition(|&b| b == b'/').map_or(0, |i| i + 1);
     match *path {
-        Cow::Borrowed(path) => Cow::Borrowed(&path[last_slash..]),
-        Cow::Owned(ref path) => Cow::Owned(path.clone()),
+        Cow::Borrowed(path) => Some(Cow::Borrowed(&path[start..])),
+        Cow::Owned(ref path) => Some(Cow::Owned(path[start..].to_vec())),
     }
 }
 ```

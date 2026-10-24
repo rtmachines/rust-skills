@@ -114,16 +114,20 @@ async fn worker(mut rx: mpsc::Receiver<Task>, shutdown: CancellationToken) {
     loop {
         tokio::select! {
             _ = shutdown.cancelled() => {
-                // Drain remaining messages
-                while let Ok(task) = rx.try_recv() {
+                // Stop admission, then finish accepted work.
+                // Outstanding permits must eventually send or be released.
+                rx.close();
+                while let Some(task) = rx.recv().await {
                     process(task).await;
                 }
                 break;
             }
-            Some(task) = rx.recv() => {
-                process(task).await;
+            task = rx.recv() => {
+                match task {
+                    Some(task) => process(task).await,
+                    None => break, // Channel closed and drained
+                }
             }
-            else => break,  // Channel closed
         }
     }
 }

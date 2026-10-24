@@ -44,7 +44,9 @@ pub struct Session { /* ... */ }
 //! use my_crate::auth::{JwtAuth, Authenticator};
 //!
 //! let auth = JwtAuth::new("secret-key");
+//! # let user = my_crate::User::example();
 //! let token = auth.generate_token(&user)?;
+//! # Ok::<(), my_crate::Error>(())
 //! ```
 //!
 //! # Feature Flags

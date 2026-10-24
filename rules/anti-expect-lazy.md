@@ -46,7 +46,7 @@ let user = db.find_user(id).await?
 
 ## When expect() Is Appropriate
 
-Use `.expect()` for invariants that indicate bugs:
+Use `.expect()` for invariants that indicate bugs. At the application boundary, a required startup failure can also justify terminating; this is a policy decision, not proof that an OS error is a programming bug:
 
 ```rust
 // Mutex poisoning indicates a bug elsewhere
@@ -55,8 +55,12 @@ let guard = mutex.lock().expect("mutex poisoned");
 // Regex is known valid at compile time
 let re = Regex::new(r"^\d{4}$").expect("invalid regex");
 
-// Thread spawn failure is unrecoverable
-let handle = thread::spawn(|| work()).expect("failed to spawn thread");
+// Startup policy: this application cannot run without this worker.
+// Builder::spawn returns io::Result; thread::spawn already panics on OS failure.
+let handle = std::thread::Builder::new()
+    .spawn(|| work())
+    .expect("required startup worker should be available");
+// Retain and eventually join the handle, or explicitly choose to detach it.
 
 // Static data that must be valid
 let config: Config = toml::from_str(EMBEDDED_CONFIG)
@@ -84,7 +88,8 @@ let x = option.ok_or(Error::MissingValue)?;
 | File/network I/O | `?` with error |
 | Database operations | `?` with error |
 | Parsed constants | `.expect()` |
-| Thread/mutex operations | `.expect()` |
+| Thread creation | Handle OS failure, or terminate by an explicit startup policy |
+| Mutex poisoning | Recover deliberately or use `.expect()` for a protected invariant |
 | After validation check | `.expect()` with explanation |
 | Never expected to fail | `.expect()` documenting invariant |
 

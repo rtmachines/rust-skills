@@ -4,13 +4,14 @@
 
 ## Why It Matters
 
-Logs and traces are routinely shipped to cloud aggregators (Datadog, Grafana Loki, Splunk) and retained for weeks or months. If a password, API token, session cookie, or piece of PII (email, SSN, health data) appears in a log line or span field, it leaks into systems with weaker access controls than your secrets manager, appears in support exports, and may violate GDPR/HIPAA/PCI-DSS. The fix is cheap: use `#[instrument(skip(...))]` or `skip_all` to exclude sensitive arguments, and wrap sensitive types in a redacting newtype or use the `secrecy` crate's `Secret<T>` which prints `[redacted]` from both `Debug` and `Display`.
+Logs and traces are routinely shipped to cloud aggregators (Datadog, Grafana Loki, Splunk) and retained for weeks or months. If a password, API token, session cookie, or piece of PII (email, SSN, health data) appears in a log line or span field, it leaks into systems with weaker access controls than your secrets manager, appears in support exports, and may violate GDPR/HIPAA/PCI-DSS. The fix is cheap: use `#[instrument(skip(...))]` or `skip_all` to exclude sensitive arguments, and wrap sensitive types in a redacting newtype or use `secrecy` 0.10's `SecretString`/`SecretBox<T>`, which redact `Debug` and deliberately do not implement `Display`.
 
 ## Bad
 
 ```rust
 use tracing::instrument;
 
+#[derive(Debug)]
 struct Credentials {
     username: String,
     password: String,   // secret
@@ -65,10 +66,15 @@ fn verify_password(_username: &str, _password: &Secret) -> bool { true }
 ```
 
 ```rust
-// Alternative: use the `secrecy` crate (Secret<T> implements Debug as "[redacted]")
-// use secrecy::{Secret, ExposeSecret};
-// struct Credentials { username: String, password: Secret<String> }
-// credentials.password.expose_secret()  // only call site that reveals value
+// Alternative for secrecy 0.10: redacted Debug, deliberately no Display.
+use secrecy::{ExposeSecret, SecretString};
+
+let password: SecretString = String::from("synthetic-test-secret").into();
+let diagnostic = format!("{password:?}");
+assert!(!diagnostic.contains("synthetic-test-secret"));
+// Use expose_secret only at a reviewed boundary, such as verification.
+assert_eq!(password.expose_secret(), "synthetic-test-secret");
+// format!("{password}") would not compile: SecretString has no Display.
 ```
 
 ## Key Points
@@ -76,7 +82,7 @@ fn verify_password(_username: &str, _password: &Secret) -> bool { true }
 - **`skip(arg)`**: exclude a single argument from `#[instrument]` auto-captured fields.
 - **`skip_all`**: exclude all arguments; then add only safe fields with `fields(key = value)`.
 - **Redacting newtypes**: override `Debug` and `Display` to emit `"[redacted]"` — this protects against accidental `?arg` or `%arg` elsewhere in the codebase.
-- **`secrecy` crate**: provides `Secret<T>` with a `[redacted]` `Debug` impl and an explicit `.expose_secret()` API so you know exactly where the value is revealed.
+- **`secrecy` 0.10**: use `SecretString`, `SecretSlice` or `SecretBox<T>`. Their `Debug` redacts; they have no `Display`. The earlier `Secret` newtype is local example code, not a type exported by this version. Call `.expose_secret()` only where the value is needed.
 - **Do not log full request bodies** in production: they may contain tokens, credentials, or PII embedded in JSON payloads. Log only metadata (size, content-type, path).
 - Audit existing spans with `RUST_LOG=trace` in a staging environment before shipping.
 

@@ -21,7 +21,7 @@ anyhow = "1"
 thiserror = "2"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-log = "0.4"
+log = { version = "0.4", features = ["kv"] }
 smallvec = "1"
 arrayvec = "0.7"
 thin-vec = "0.2"
@@ -36,7 +36,7 @@ ahash = "0.8"
 secrecy = "0.10"
 memchr = "2"
 static_assertions = "1"
-bumpalo = "3"
+bumpalo = { version = "3", features = ["boxed", "collections"] }
 indexmap = "2"
 tempfile = "3"
 mockall = "0.13"

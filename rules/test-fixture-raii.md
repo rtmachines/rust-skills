@@ -52,14 +52,17 @@ fn test_with_temp_file() {
 // Custom RAII guard for environment variables
 struct EnvGuard {
     key: String,
-    original: Option<String>,
+    original: Option<std::ffi::OsString>,
 }
 
 impl EnvGuard {
-    fn set(key: &str, value: &str) -> Self {
-        let original = std::env::var(key).ok();
-        // SAFETY: env::set_var is unsafe since the 2024 edition (env writes are
-        // not thread-safe); env-touching tests should run single-threaded.
+    /// # Safety
+    /// Run in a dedicated single-threaded process. No other thread may read
+    /// or write the environment while this guard exists, including its Drop.
+    unsafe fn set(key: &str, value: &str) -> Self {
+        let original = std::env::var_os(key);
+        // SAFETY: the caller guarantees exclusive process-environment access
+        // until this guard is dropped.
         unsafe { std::env::set_var(key, value) };
         EnvGuard {
             key: key.to_string(),
@@ -70,7 +73,7 @@ impl EnvGuard {
 
 impl Drop for EnvGuard {
     fn drop(&mut self) {
-        // SAFETY: see EnvGuard::set — restored on the same single-threaded test
+        // SAFETY: EnvGuard::set requires exclusive access until Drop completes.
         match &self.original {
             Some(v) => unsafe { std::env::set_var(&self.key, v) },
             None => unsafe { std::env::remove_var(&self.key) },
@@ -78,15 +81,19 @@ impl Drop for EnvGuard {
     }
 }
 
-#[test]
-fn test_with_env_var() {
-    let _guard = EnvGuard::set("MY_VAR", "test_value");
+// Entry point of a dedicated test-helper binary, launched as a subprocess.
+// Unlike the parallel test harness, this process has not started any threads.
+fn main() {
+    // SAFETY: no other threads exist in this helper process.
+    let _guard = unsafe { EnvGuard::set("MY_VAR", "test_value") };
     
     let result = read_config();
     
     assert!(result.is_ok());
 }  // MY_VAR automatically restored
 ```
+
+Use `OsString`/`var_os` to preserve even non-Unicode environment values. Prefer injecting configuration or passing environment variables to a child process with `Command::env`; serializing tests alone does not prove that unrelated library threads avoid environment access.
 
 ## Common RAII Patterns
 

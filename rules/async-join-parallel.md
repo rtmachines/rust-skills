@@ -65,7 +65,10 @@ let (a, b, c) = join!(future_a, future_b, future_c);
 // try_join! - short-circuits on first error
 let (a, b, c) = try_join!(fallible_a, fallible_b, fallible_c)?;
 // If fallible_b fails, returns Err immediately
-// Other futures may still be running (cancellation is async)
+// Other owned branch futures are dropped synchronously before return.
+// Borrowing &mut F does not destroy the underlying F. Dropping a JoinHandle
+// detaches its spawned task; submitted blocking work or I/O may continue.
+// Decide separately whether external effects need cancellation and joining.
 ```
 
 ## futures::join_all for Dynamic Collections

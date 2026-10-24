@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-When an entire function is marked `unsafe fn`, every line inside appears equally suspect to an auditor. Shrinking unsafe blocks to the minimum isolates exactly which operation violates Rust's safety invariants, making reviews tractable and bugs easier to find. The Rust 2024 edition enforces this with the `unsafe_op_in_unsafe_fn` lint: unsafe operations inside an `unsafe fn` now require their own explicit `unsafe {}` block rather than inheriting the function's unsafety implicitly.
+An `unsafe fn` declares obligations for its caller; an `unsafe` block identifies operations whose preconditions the implementation must establish. Keep those blocks small enough to review the relevant proof. In edition 2024, `unsafe_op_in_unsafe_fn` warns by default when such an operation lacks an explicit block. Use `#![deny(unsafe_op_in_unsafe_fn)]` if the project wants to make that diagnostic an error.
 
 ## Bad
 
@@ -21,7 +21,7 @@ unsafe fn sum_at(ptr: *const i32, len: usize, index: usize) -> i32 {
 
 ```rust
 // Huge unsafe block wrapping safe logic inside an unsafe fn (2024 edition
-// now requires unsafe {} here anyway, but large blocks are still bad style).
+// warns about missing explicit unsafe blocks, but large blocks obscure proofs).
 pub unsafe fn process(ptr: *const u8, len: usize) -> Vec<u8> {
     unsafe {
         let mut result = Vec::with_capacity(len); // safe
@@ -36,20 +36,24 @@ pub unsafe fn process(ptr: *const u8, len: usize) -> Vec<u8> {
 ## Good
 
 ```rust
-// Safe wrapper: the single unsafe operation is clearly isolated.
-fn sum_at(ptr: *const i32, len: usize, index: usize) -> i32 {
-    assert!(index < len, "index out of bounds");
-    // SAFETY: index < len guarantees ptr.add(index) is within the allocation.
-    let value = unsafe { *ptr.add(index) };
+// A slice establishes validity and lifetime; an integer length beside an
+// arbitrary raw pointer would not. Ordinary values[index] is preferable unless
+// profiling justifies unchecked access; this demonstrates a local proof.
+fn sum_at(values: &[i32], index: usize) -> i32 {
+    assert!(index < values.len(), "index out of bounds");
+    // SAFETY: values is a live slice and the assertion proves index is in it.
+    let value = unsafe { *values.get_unchecked(index) };
     value + 1
 }
 ```
 
 ```rust
-// In a genuinely unsafe fn, 2024 edition still requires unsafe {} per op.
+// Explicit blocks also make a genuinely unsafe function easier to audit.
 /// # Safety
 ///
-/// `ptr` must be valid for reads for `len` bytes and properly aligned.
+/// For nonzero `len`, `ptr` must point to at least `len` initialized bytes in
+/// one live allocation, readable without concurrent mutation for this call.
+/// Pointer arithmetic over that range must remain within the allocation.
 pub unsafe fn process(ptr: *const u8, len: usize) -> Vec<u8> {
     let mut result = Vec::with_capacity(len); // safe — outside any unsafe block
     for i in 0..len {
@@ -63,8 +67,8 @@ pub unsafe fn process(ptr: *const u8, len: usize) -> Vec<u8> {
 
 ## Key Points
 
-- **2024 edition `unsafe_op_in_unsafe_fn`**: even inside an `unsafe fn`, each unsafe operation now needs its own `unsafe {}`. This is a hard error in Rust 2024.
-- A safe wrapper around a small `unsafe {}` is almost always preferable to exposing the entire function as `unsafe fn`.
+- **2024 edition `unsafe_op_in_unsafe_fn`**: missing explicit unsafe blocks produce a warning by default, or an error when the lint is set to `deny`/`forbid`.
+- A safe wrapper must establish the unsafe preconditions for every legal safe call. If validity depends on caller-supplied raw pointers, expose an `unsafe fn` with a complete contract or change the interface to references/slices.
 - Each small unsafe block needs its own `// SAFETY:` comment (see `unsafe-safety-comment`).
 - If multiple consecutive lines are all unsafe for the *same* invariant reason, a single block covering only those lines is acceptable.
 

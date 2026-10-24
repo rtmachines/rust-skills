@@ -1,15 +1,15 @@
 # anti-index-over-iter
 
-> Don't use indexing when iterators work
+> Prefer iterators when they make traversal clearer; measure performance differences
 
 ## Why It Matters
 
-Manual indexing (`for i in 0..len`) requires bounds checks on every access, prevents SIMD optimization, and introduces off-by-one error risks. Iterators eliminate these issues and are more idiomatic Rust.
+Iterators express traversal directly and can make off-by-one mistakes less likely. Indexing also supports bounds-check elimination and SIMD when the optimizer can prove the range: a loop over 0..data.len() is a common case. Neither syntax alone guarantees vectorization or faster code; measure representative optimized builds.
 
-## Bad
+## Index-Based Version
 
 ```rust
-// Manual indexing - bounds checked every access
+// The range can let the optimizer prove each index is in bounds
 fn sum_squares(data: &[i32]) -> i64 {
     let mut result = 0i64;
     for i in 0..data.len() {
@@ -36,7 +36,7 @@ fn normalize(data: &mut [f64]) {
 }
 ```
 
-## Good
+## Iterator Version
 
 ```rust
 // Iterator - no bounds checks, SIMD-friendly
@@ -74,8 +74,8 @@ for (i, item) in items.iter().enumerate() {
 }
 
 // Non-sequential access
-for i in (0..len).step_by(2) {
-    swap(&mut data[i], &mut data[i + 1]);
+for pair in data.chunks_exact_mut(2) {
+    pair.swap(0, 1); // Leaves an odd trailing element unchanged
 }
 
 // Multi-dimensional iteration
@@ -90,7 +90,7 @@ for i in 0..rows {
 
 | Pattern | Bounds Checks | SIMD | Safety |
 |---------|---------------|------|--------|
-| `for i in 0..len { data[i] }` | Every access | Limited | Off-by-one risk |
+| `for i in 0..data.len() { data[i] }` | Can be eliminated | Can vectorize | Safe indexing panics if an invalid index is reached |
 | `for x in &data` | None | Good | Safe |
 | `for x in data.iter()` | None | Good | Safe |
 | `data.iter().enumerate()` | None | Good | Safe |
@@ -111,7 +111,7 @@ for i in 0..rows {
 // Iterator version can auto-vectorize
 let sum: i32 = data.iter().sum();
 
-// Manual indexing prevents vectorization
+// This indexed loop can also auto-vectorize and eliminate bounds checks
 let mut sum = 0;
 for i in 0..data.len() {
     sum += data[i];

@@ -133,12 +133,12 @@ mock.expect_count().returning(|| 42);
 // Based on input
 mock.expect_double().returning(|x| x * 2);
 
-// Different values per call
+// Different values per call: keep state in one FnMut closure.
+// Repeated .returning(...) calls would replace the same expectation.
+let mut values = [1, 2, 3].into_iter();
 mock.expect_next()
     .times(3)
-    .returning(|| 1)
-    .returning(|| 2)
-    .returning(|| 3);
+    .returning(move || values.next().expect("exactly three calls expected"));
 
 // Return owned values
 mock.expect_get_name()

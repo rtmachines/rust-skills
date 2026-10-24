@@ -53,8 +53,6 @@ Create `rustfmt.toml` for custom settings:
 edition = "2021"
 max_width = 100
 use_small_heuristics = "Max"
-imports_granularity = "Module"
-group_imports = "StdExternalCrate"
 reorder_imports = true
 ```
 
@@ -66,8 +64,8 @@ reorder_imports = true
 | `tab_spaces` | 4 | Spaces per indent |
 | `edition` | "2015" | Rust edition |
 | `use_small_heuristics` | "Default" | Layout heuristics |
-| `imports_granularity` | "Preserve" | Import grouping |
-| `group_imports` | "Preserve" | Import ordering |
+| `imports_granularity` | "Preserve" | Import grouping (nightly only) |
+| `group_imports` | "Preserve" | Import ordering (nightly only) |
 
 ## Running Locally
 
@@ -78,8 +76,8 @@ cargo fmt --all --check
 # Apply formatting
 cargo fmt --all
 
-# Format specific file
-cargo fmt -- src/main.rs
+# Format a specific file directly
+rustfmt --edition 2021 src/main.rs
 
 # Check with verbose output
 cargo fmt --all --check -- --verbose
@@ -97,9 +95,11 @@ cargo fmt -p my-package
 
 ## Ignoring Files
 
-In `rustfmt.toml`:
+The `ignore` configuration option requires nightly rustfmt; stable ignores it with a warning:
 
 ```toml
+# rustfmt.toml (nightly only)
+unstable_features = true
 # Skip generated files
 ignore = [
     "src/generated/*",
@@ -107,7 +107,7 @@ ignore = [
 ]
 ```
 
-Or in code:
+On stable, use `#[rustfmt::skip]` on the relevant item or module declaration:
 
 ```rust
 #[rustfmt::skip]
@@ -129,7 +129,8 @@ Some options require nightly:
 ```toml
 # rustfmt.toml (nightly only)
 unstable_features = true
-imports_granularity = "Crate"
+imports_granularity = "Module"
+group_imports = "StdExternalCrate"
 wrap_comments = true
 format_code_in_doc_comments = true
 ```

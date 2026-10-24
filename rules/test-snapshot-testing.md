@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Asserting large structured output — pretty-printed structs, rendered error messages, JSON responses, generated code, CLI output — with hand-written `assert_eq!` is verbose, brittle, and hard to update when output intentionally changes. The `insta` crate records an approved snapshot on first run and diffs against it on subsequent runs; when output changes legitimately, `cargo insta review` presents a diff and lets you accept it in one keystroke. Snapshots are committed to the repo and reviewed in PRs, making output changes visible and deliberate rather than silent.
+Asserting large structured output — pretty-printed structs, rendered error messages, JSON responses, generated code, CLI output — with hand-written `assert_eq!` is verbose, brittle, and hard to update when output intentionally changes. The `insta` crate records a candidate snapshot for review on the first run and diffs against the accepted snapshot on subsequent runs; when output changes legitimately, `cargo insta review` presents a diff and lets you accept it in one keystroke. Snapshots are committed to the repo and reviewed in PRs, making output changes visible and deliberate rather than silent.
 
 ## Bad
 
@@ -67,7 +67,9 @@ fn test_cli_output() {
 1. Run tests for the first time: `cargo test` — insta creates `.snap.new` files.
 2. Review and accept: `cargo insta review` — interactive diff; press `a` to accept.
 3. Commit the `.snap` files alongside your code changes.
-4. In CI, run `cargo test` and `cargo insta test --check` (or set `INSTA_UPDATE=unseen`) to fail if any snapshot is new or changed without being committed.
+4. In CI, run `cargo test` and `cargo insta test --check` (or set `INSTA_UPDATE=no`) to fail if any snapshot is new or changed without being committed.
+
+`INSTA_UPDATE=unseen` automatically accepts previously unseen snapshots, so it is unsuitable for a CI policy that requires review of every new snapshot.
 
 ```bash
 # CI: fail on any unapproved snapshots

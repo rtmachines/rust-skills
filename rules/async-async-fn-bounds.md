@@ -1,18 +1,18 @@
 # async-async-fn-bounds
 
-> Use `AsyncFn`/`AsyncFnMut`/`AsyncFnOnce` bounds instead of `F: Fn() -> Fut, Fut: Future`
+> Use `AsyncFn*` for lending async callbacks; keep explicit future bounds when that contract fits
 
 ## Why It Matters
 
 The `AsyncFn`, `AsyncFnMut`, and `AsyncFnOnce` traits stabilized in Rust 1.85 (February 2025). They let you express higher-order async function bounds in a single, readable constraint — and, critically, they handle lifetime capture correctly. The old two-generic pattern `F: Fn() -> Fut, Fut: Future<Output = T>` cannot accept `async ||` closures that borrow from their environment, because the future's lifetime is not linked to the closure's call. `AsyncFn` solves this structurally.
 
-## Bad
+## Separate Future Type
 
 ```rust
 use std::future::Future;
 
-// two-generic pattern: verbose, and cannot accept async closures
-// that borrow from their environment across the call
+// Useful for non-lending callbacks, including an explicit Fut: Send bound.
+// It cannot express every async closure that borrows its captures across a call.
 async fn retry<F, Fut, T, E>(times: usize, f: F) -> Result<T, E>
 where
     F: Fn() -> Fut,
@@ -82,9 +82,9 @@ async fn example() {
 
 | Bound | Receiver | Use when |
 |---|---|---|
-| `AsyncFn()` | `&self` | callable multiple times, no mutation |
+| `AsyncFn()` | `&self` | callable through shared access; interior mutation is still possible |
 | `AsyncFnMut()` | `&mut self` | callable multiple times, may mutate captured state |
-| `AsyncFnOnce()` | `self` | callable exactly once, may consume captured state |
+| `AsyncFnOnce()` | `self` | invoked at most once by this owner; may consume captures |
 
 These mirror `Fn` / `FnMut` / `FnOnce` semantics, so the same rules apply: prefer `AsyncFn` first; fall back to `AsyncFnMut` or `AsyncFnOnce` when needed.
 
@@ -93,7 +93,24 @@ These mirror `Fn` / `FnMut` / `FnOnce` semantics, so the same rules apply: prefe
 - `AsyncFn()` desugars the bound `F: AsyncFn<(), Output = T>` — the call syntax mirrors `Fn()`.
 - Plain `async fn` items (not closures) automatically implement `AsyncFn` when their signature matches.
 - `AsyncFn` is in `std::ops` but the traits are brought in scope automatically in the 2024 edition; in older editions you may need `use std::ops::AsyncFn;`.
-- The compiler still infers `Send`-ness from the closure body; if you need `Send` futures (Tokio multi-threaded), add `+ Send` to the bound or use a `Send` wrapper.
+- `F: AsyncFn() -> T + Send` only makes the callable Send. It does **not** promise that each returned future is Send. Inspect or express that promise separately; wrapping a non-Send future in a struct or box does not make it Send.
+
+For a non-lending callback, this stable helper states the future's bound explicitly:
+
+```rust
+use std::future::Future;
+
+fn spawn_call<F, Fut, T>(callback: F) -> tokio::task::JoinHandle<T>
+where
+    F: FnOnce() -> Fut + Send + 'static,
+    Fut: Future<Output = T> + Send,
+    T: Send + 'static,
+{
+    tokio::spawn(async move { callback().await })
+}
+```
+
+Keep and await the returned handle. For lending callbacks, use a local execution contract when sufficient, or an interface whose returned future separately guarantees Send; do not claim that adding Send only to AsyncFn establishes this.
 
 ## See Also
 

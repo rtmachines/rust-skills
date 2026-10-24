@@ -117,13 +117,17 @@ struct Node {
     children: Vec<impl Into<Node>>,  // Error: impl Trait not allowed here
 }
 
-// ❌ Performance-critical hot paths (minor overhead of trait dispatch)
-fn hot_path(value: impl Into<u64>) {
-    // Consider taking u64 directly if called billions of times
-}
-
 // ❌ When you need to name the type
 fn returns_impl() -> impl Into<String> { }  // Opaque, hard to use
+```
+
+For hot paths, measure the actual conversion. A concrete parameter may simplify inference and limit monomorphizations, but `impl Into` itself does not require extra runtime dispatch.
+
+```rust
+// Generic and monomorphized: not inherently a runtime dispatch overhead.
+fn hot_path(value: impl Into<u64>) -> u64 {
+    value.into()  // Cost depends on the concrete conversion and optimization
+}
 ```
 
 ## Builder Pattern with Into

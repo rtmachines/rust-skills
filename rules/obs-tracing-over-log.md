@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-`println!` and `eprintln!` have no concept of log levels, targets, or structured data — they cannot be silenced, filtered, or parsed by observability pipelines. The `log` facade improves this but emits only flat strings and has no notion of spans. `tracing` records both *events* (point-in-time observations) and *spans* (contextual scopes that automatically follow execution across `.await` points and threads), with structured key-value fields, level filtering, and target routing. It is also interoperable with the `log` ecosystem via `tracing`'s `log` feature flag.
+`println!` and `eprintln!` have no concept of log levels, targets, or structured data — they cannot be silenced, filtered, or parsed by observability pipelines. The `log` facade provides levels, targets, and structured fields when its `kv` feature is enabled, but it has no span model. `tracing` records both *events* (point-in-time observations) and *spans* (contextual scopes attached to execution with `#[instrument]` or `Instrument`; propagate them deliberately to spawned work), with structured key-value fields, level filtering, and target routing. It is also interoperable with the `log` ecosystem via `tracing`'s `log` feature flag.
 
 ## Bad
 
@@ -41,12 +41,12 @@ fn main() {
 | Approach | Levels | Structured | Async-aware spans | `log` compat |
 |---|---|---|---|---|
 | `println!` | No | No | No | No |
-| `log` facade | Yes | No | No | Yes |
+| `log` facade | Yes | Yes with `kv` | No | Yes |
 | `tracing` | Yes | Yes | Yes | Yes (via feature) |
 
 - Add to `Cargo.toml`: `tracing = "0.1"` for all crates; `tracing-subscriber = { version = "0.3", features = ["env-filter"] }` for binaries only.
 - The `%expr` sigil uses `Display`; `?expr` uses `Debug`; bare `field = value` records typed primitives.
-- `tracing` ships a `log` compatibility bridge: set `tracing-subscriber`'s `log` feature or call `tracing_log::LogTracer::init()` to capture existing `log`-emitting dependencies.
+- `tracing` ships a `log` compatibility bridge: enable `tracing-subscriber`'s `tracing-log` feature (enabled by default); its subscriber initialization also installs `LogTracer`. For manual subscriber setup, install `tracing_log::LogTracer` once. Avoid initializing it twice.
 
 ## See Also
 

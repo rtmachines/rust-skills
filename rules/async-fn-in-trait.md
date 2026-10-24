@@ -1,12 +1,12 @@
 # async-fn-in-trait
 
-> Use native `async fn` in traits (stable 1.75) instead of the `async_trait` macro
+> Prefer native `async fn` in traits for static dispatch; use explicit boxing when dynamic dispatch is required
 
 ## Why It Matters
 
 Since Rust 1.75, you can write `async fn` directly inside trait definitions (AFIT — async functions in traits). This eliminates the `#[async_trait]` proc-macro dependency and removes the hidden `Box<dyn Future>` allocation it inserts on every call. Fewer allocations, no macro expansion overhead, and no extra crate to audit. However, native async fn in traits carries two precise caveats you must understand before migrating.
 
-## Bad
+## Boxed Approach for Dynamic Dispatch
 
 ```rust
 // requires async_trait crate; boxes every future on the heap
@@ -33,7 +33,7 @@ impl Repo for PgRepo {
 }
 ```
 
-## Good
+## Native Approach for Static Dispatch
 
 ```rust
 // native async fn in traits — no macro, no boxing
@@ -58,45 +58,68 @@ impl Repo for PgRepo {
 
 ## Caveats
 
-**Caveat 1 — not dyn-compatible.** Native async fn in traits is not yet object-safe. You cannot write `Box<dyn Repo>` with the definition above. For dynamic dispatch you have two options:
-
-- Keep `#[async_trait]` (it boxes the future, which makes the trait object-safe).
-- Use the `trait-variant` crate's `#[trait_variant::make]` macro, which generates a boxed-future variant alongside your native async trait.
+**Caveat 1 — not dyn-compatible.** A dispatchable native async method (or an opaque-return method) prevents this trait from being used as `dyn Repo`. Keep `#[async_trait]` when its boxing policy fits, or expose an explicit boxed-future interface:
 
 ```rust
-// using trait-variant to get both a static and a dyn-compatible variant
-#[trait_variant::make(RepoSend: Send)]
-trait Repo {
-    async fn get(&self, id: u64) -> anyhow::Result<String>;
+use std::future::Future;
+use std::pin::Pin;
+
+trait DynRepo: Send + Sync {
+    fn get(&self, id: u64)
+        -> Pin<Box<dyn Future<Output = anyhow::Result<String>> + Send + '_>>;
 }
 
-// `RepoSend` is the Send-bounded version; it IS dyn-compatible via boxing
-fn make_repo() -> Box<dyn RepoSend> {
-    // ...
-    # unimplemented!()
+struct MemoryRepo;
+
+impl DynRepo for MemoryRepo {
+    fn get(&self, id: u64)
+        -> Pin<Box<dyn Future<Output = anyhow::Result<String>> + Send + '_>>
+    {
+        Box::pin(async move { Ok(format!("row-{id}")) })
+    }
+}
+
+fn make_repo() -> Box<dyn DynRepo> {
+    Box::new(MemoryRepo)
 }
 ```
 
-**Caveat 2 — futures are not `Send` by default.** On a multi-threaded Tokio runtime, spawned tasks require `Send` futures. The auto-generated future from a native `async fn` in a trait captures `&self` but does not promise `Send`. If you need `Send`, either:
+**Caveat 2 — returned futures need their own `Send` contract.** `tokio::spawn` requires `Send + 'static` futures, including on a current-thread runtime. Use `LocalSet`/`spawn_local` for supported non-Send tasks. A native async trait alone does not promise a Send future, even when an implementation happens to produce one.
 
-- Use `#[trait_variant::make(TraitNameSend: Send)]` from the `trait-variant` crate to generate a `Send`-bounded variant.
-- Bound the return type explicitly: `fn get(&self, id: u64) -> impl Future<Output = anyhow::Result<String>> + Send`.
+`trait-variant` 0.1 generates a static-dispatch variant with additional bounds; it does **not** generate a boxed, dyn-compatible interface:
 
 ```rust
-// explicit Send bound on the return future
+#[trait_variant::make(RepoSend: Send)]
+trait LocalRepo {
+    async fn get(&self, id: u64) -> anyhow::Result<String>;
+}
+
+// RepoSend is still used through generics, not Box<dyn RepoSend>.
+async fn load<R: RepoSend>(repo: &R, id: u64) -> anyhow::Result<String> {
+    repo.get(id).await
+}
+```
+
+Alternatively, express the return-future bound directly:
+
+```rust
+use std::future::Future;
+
 trait Repo {
     fn get(&self, id: u64) -> impl Future<Output = anyhow::Result<String>> + Send;
 }
 ```
+
+The callable/receiver's thread-safety bounds and the returned future's bounds are separate. For a future borrowing `&self`, the implementation must also make the captured borrow safe to send.
 
 ## When to Use Each Approach
 
 | Scenario | Recommended approach |
 |---|---|
 | Static dispatch only (generics, `impl Trait`) | Native `async fn` in trait |
-| Need `dyn Trait` | `#[async_trait]` or `trait-variant` |
+| Need `dyn Trait` | `#[async_trait]` or an explicit boxed-future interface |
 | Multi-threaded Tokio, spawned tasks | `trait-variant` `Send` variant or explicit `+ Send` |
-| Single-threaded runtime / `LocalSet` | Native `async fn` in trait (no `Send` needed) |
+| Local task driven by `LocalSet`/`spawn_local` | Native `async fn` without a Send promise when appropriate |
 
 ## See Also
 

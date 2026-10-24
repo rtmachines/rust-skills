@@ -12,7 +12,7 @@ Some return values should never be ignored—`Result`, locks, RAII guards, compu
 // Result ignored - error silently dropped
 fn send_email(to: &str, body: &str) -> Result<(), EmailError> { ... }
 
-send_email("user@example.com", "Hello!");  // No warning if Result ignored!
+send_email("user@example.com", "Hello!");  // Already warns: Result is #[must_use]
 // Email may have failed, but we don't know
 
 // Computed value ignored - likely a bug
@@ -58,9 +58,10 @@ enum AppError { ... }
 ## Standard Library Examples
 
 ```rust
-// Result and Option are #[must_use]
+// Result is #[must_use]; Option itself is not.
+// Some functions returning Option, such as slice::first, are #[must_use].
 let v: Vec<i32> = vec![1, 2, 3];
-v.first();  // Warning: unused Option
+v.first();  // Warning from the method's #[must_use] attribute
 
 // Iterator adapters are #[must_use]
 v.iter().map(|x| x * 2);  // Warning: iterators are lazy
@@ -81,19 +82,20 @@ fn add(a: i32, b: i32) -> i32 { a + b }
 #[must_use = "builder methods return a new builder"]
 fn with_timeout(self, t: Duration) -> Self { ... }
 
-// ✅ Fallible operations
-#[must_use]
+// Result already warns; add a function attribute when a specific message helps.
+#[must_use = "handle the parsed data or report the parse error"]
 fn try_parse(s: &str) -> Result<Data, ParseError> { ... }
 
 // ✅ Iterators and futures (lazy)
 #[must_use = "iterators are lazy and do nothing unless consumed"]
 struct Map<I, F> { ... }
 
-// ❌ Side-effecting functions where result is optional
-fn log(msg: &str) -> Result<(), io::Error> { ... }  // Might be ok to ignore
+// A Result still warns even when the caller chooses best-effort handling.
+fn log(msg: &str) -> Result<(), io::Error> { ... }
+let _ = log("best-effort event");  // Explicitly discard an optional error
 
 // ❌ Methods with useful side effects
-fn vec.push(item);  // Mutates vec, no return to use
+vec.push(item);  // Mutates vec, no return to use
 ```
 
 ## Custom Messages
@@ -114,8 +116,10 @@ async fn fetch() -> Data { ... }
 ```toml
 [lints.clippy]
 must_use_candidate = "warn"      # Suggests where to add #[must_use]
-unused_must_use = "deny"          # Built-in, treat warnings as errors
 double_must_use = "warn"          # Redundant #[must_use]
+
+[lints.rust]
+unused_must_use = "deny"          # Built-in Rust lint, treat warnings as errors
 ```
 
 ## See Also

@@ -50,10 +50,10 @@ async fn test_concurrent_operations() {
 ## Runtime Configuration
 
 ```rust
-// Multi-threaded runtime (default)
+// Current-thread runtime (default for tokio::test)
 #[tokio::test]
 async fn test_default_runtime() {
-    // Uses multi-thread runtime
+    // Each test gets its own current-thread runtime.
 }
 
 // Single-threaded (current_thread)
@@ -75,6 +75,8 @@ async fn test_with_time_control() {
     tokio::time::advance(Duration::from_secs(60)).await;
 }
 ```
+
+`flavor = "multi_thread"` requires Tokio's `rt-multi-thread` feature; `start_paused` and `advance` require `test-util` and the current-thread runtime. The default of `tokio::test` differs from the default of `tokio::main`.
 
 ## Testing Timeouts
 

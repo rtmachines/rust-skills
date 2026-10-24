@@ -143,9 +143,11 @@ cargo test
 # Test with serde
 cargo test --features serde
 
-# Test all feature combinations
+# Test one configuration with all features enabled together
 cargo test --all-features
 ```
+
+Run each supported feature combination as a separate CI job. For the three optional dependencies above, also test `--no-default-features --features rkyv`, `borsh`, and the supported pairs; `--all-features` does not enumerate those configurations.
 
 ```rust
 // Test serde round-trip when feature enabled

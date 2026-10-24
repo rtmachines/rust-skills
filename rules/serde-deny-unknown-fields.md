@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-By default, serde silently discards any key in the input that doesn't match a struct field. For user-facing config files and strict API contracts this is dangerous: a typo like `"timout_secs"` passes validation without error, and the intended field is simply never set. `#[serde(deny_unknown_fields)]` turns unrecognized keys into hard errors, surfacing mistakes immediately.
+By default, serde silently discards any key in the input that doesn't match a struct field. For user-facing config files and strict API contracts this is dangerous: a typo like `"timout_secs"` can be ignored and a default used when the intended field has `#[serde(default)]`. Without a default, the missing required field already causes an error, independently of unknown-field handling. `#[serde(deny_unknown_fields)]` turns unrecognized keys into hard errors, surfacing mistakes immediately.
 
 ## Bad
 
@@ -16,11 +16,12 @@ use serde_json;
 struct ServerConfig {
     host: String,
     port: u16,
+    #[serde(default)]
     timeout_secs: u64,
 }
 
 fn main() {
-    // "timout_secs" is a typo — serde silently ignores it, timeout stays 0
+    // "timout_secs" is ignored; #[serde(default)] makes the missing timeout 0
     let json = r#"{"host":"localhost","port":8080,"timout_secs":30}"#;
     let cfg: ServerConfig = serde_json::from_str(json).unwrap();
     println!("{:?}", cfg); // timeout_secs is 0, not 30
@@ -38,6 +39,7 @@ use serde_json;
 struct ServerConfig {
     host: String,
     port: u16,
+    #[serde(default)]
     timeout_secs: u64,
 }
 
@@ -66,7 +68,7 @@ fn main() {
 
 ## Caveats
 
-`#[serde(deny_unknown_fields)]` is **incompatible with `#[serde(flatten)]`** on the same struct. `flatten` needs to pass unmatched keys down to the flattened field; `deny_unknown_fields` intercepts them first. If you need both behaviors, split the struct or use a two-pass approach (deserialize into a `serde_json::Value`, then convert).
+`#[serde(deny_unknown_fields)]` is **incompatible with `#[serde(flatten)]`** on the same struct. `flatten` needs to pass unmatched keys down to the flattened field; `deny_unknown_fields` intercepts them first. Use separate raw input types or explicit validation when you need strict checks together with extensible data. Merely converting through `serde_json::Value` does not make the unsupported attribute combination work, and it discards duplicate object keys.
 
 ## See Also
 

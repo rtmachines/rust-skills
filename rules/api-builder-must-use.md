@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Builder pattern methods return a modified builder. Without `#[must_use]`, calling a builder method and ignoring the return value silently does nothing—the builder is dropped, and the configuration is lost. This creates confusing bugs where code appears correct but has no effect.
+Consuming builder methods return a modified builder. Without `#[must_use]`, ignoring that return value can silently drop the builder and lose the configuration. The original non-Copy builder has also been moved, so attempting to use it again is already a compile error. `#[must_use]` catches a discarded result even when there is no later use. A setter taking `&mut self` is different: it still modifies the receiver when its return value is ignored.
 
 ## Bad
 
@@ -30,8 +30,8 @@ impl RequestBuilder {
 // Bug: builder methods are ignored - no warning!
 let request = RequestBuilder::new("https://api.example.com");
 request.timeout(Duration::from_secs(30));  // Dropped silently!
-request.header("Authorization", "Bearer token");  // Dropped silently!
-let response = request.send();  // Sends with no timeout or headers
+// A later request.header(...) or request.send() would fail with E0382:
+// timeout consumed request; there is no old configuration left to send.
 ```
 
 ## Good
@@ -123,9 +123,13 @@ return_self_not_must_use = "warn"  # Specifically for -> Self methods
 ## Standard Library Examples
 
 ```rust
-// std::Option - must_use on map, and, or
+// Option itself and Option::map are not #[must_use].
 let x: Option<i32> = Some(5);
-x.map(|v| v * 2);  // Warning: unused return value
+x.map(|v| v * 2);  // No unused_must_use warning
+
+// Some methods returning Option carry their own #[must_use].
+let values = [1, 2, 3];
+values.first();  // Warning from slice::first
 
 // std::Result - must_use on the type itself
 #[must_use = "this `Result` may be an `Err` variant, which should be handled"]

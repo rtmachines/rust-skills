@@ -1,10 +1,10 @@
 # opt-lto-release
 
-> Enable LTO in release builds
+> Measure LTO for release builds and choose its scope deliberately
 
 ## Why It Matters
 
-Link-Time Optimization (LTO) enables optimizations across crate boundaries that aren't possible during normal compilation. This includes cross-crate inlining, dead code elimination, and devirtualization. Typically provides 5-20% performance improvement.
+Link-Time Optimization (LTO) enables additional optimization across code-generation units and crate boundaries, including inlining, dead-code elimination and devirtualization. Some cross-crate optimization, notably generic monomorphization, is already possible without LTO. Measure build time, binary size and representative workloads; no fixed speedup or ranking of modes is guaranteed.
 
 ## Bad
 
@@ -18,30 +18,33 @@ opt-level = 3
 ## Good
 
 ```toml
-# Cargo.toml - optimized release profile
+# Cargo.toml - candidate profile to benchmark
 [profile.release]
 opt-level = 3
-lto = "fat"          # Maximum optimization
-codegen-units = 1    # Better optimization (single codegen unit)
-panic = "abort"      # Smaller binary, no unwind tables
+lto = "fat"          # Whole-graph LTO; compare with thin and off
+codegen-units = 1    # Less parallel code generation; benchmark the trade-off
+# panic = "abort"    # Optional behavior change: no unwinding/cleanup on panic
 strip = true         # Remove symbols for smaller binary
 ```
 
 ## LTO Options Explained
 
+These are alternative values, not entries to combine in one TOML table:
+
 ```toml
-# No LTO (default)
+# Default: local ThinLTO across this crate's codegen units when applicable.
+# Not performed with codegen-units = 1 or opt-level = 0.
 lto = false
 
-# Thin LTO - fast compilation, most benefits
+# Thin LTO across crates - typically less build cost than fat LTO
 lto = "thin"
 
-# Fat LTO - slowest compilation, maximum optimization
+# Fat LTO across crates - broader analysis, often greater build cost
 lto = "fat"
 # Equivalent to:
 lto = true
 
-# Thin-local - LTO within each crate only
+# Disable LTO entirely, including local ThinLTO
 lto = "off"
 ```
 
@@ -49,14 +52,15 @@ lto = "off"
 
 | Setting | Compile Time | Binary Size | Performance |
 |---------|--------------|-------------|-------------|
-| `lto = false` | Fast | Larger | Baseline |
-| `lto = "thin"` | Medium | Smaller | +5-15% |
-| `lto = "fat"` | Slow | Smallest | +10-20% |
+| `lto = "off"` | No LTO work | Measure | Comparison without LTO |
+| `lto = false` | Local ThinLTO when applicable | Measure | Cargo default |
+| `lto = "thin"` | Cross-crate ThinLTO work | Measure | Workload-dependent |
+| `lto = "fat"` | Whole-graph analysis, often more build work | Measure | Workload-dependent |
 
 ## Evidence from Production
 
-Many production crates enable fat LTO and `codegen-units = 1` in their release
-profiles for maximum performance. For example, ripgrep ships a `release-lto`
+Some production crates offer fat LTO and `codegen-units = 1` as build choices.
+For example, ripgrep ships a `release-lto`
 profile (see the Cargo Book for profile documentation:
 <https://doc.rust-lang.org/cargo/reference/profiles.html>):
 
@@ -73,7 +77,7 @@ inherits = "release"
 opt-level = 3
 lto = "fat"
 codegen-units = 1
-panic = "abort"
+# panic = "abort" # opt in only if abort-on-panic matches the application
 strip = "symbols"
 ```
 
@@ -81,10 +85,10 @@ strip = "symbols"
 
 ```toml
 [profile.release]
-opt-level = 3        # Maximum optimization
+opt-level = 3        # Optimize for speed; measure against other settings
 lto = "fat"          # Link-time optimization
 codegen-units = 1    # Single codegen unit for better optimization
-panic = "abort"      # Remove panic unwinding code
+# panic = "abort"    # Optional abort-on-panic behavior
 strip = true         # Strip symbols
 debug = false        # No debug info
 
@@ -109,13 +113,13 @@ opt-level = 3        # Optimize dependencies even in dev
 |-----------|-------------|
 | Development | `false` (fast compiles) |
 | CI builds | `"thin"` (balance) |
-| Release binaries | `"fat"` (max perf) |
+| Release binaries | Benchmark `"thin"`, `"fat"`, `false` and `"off"` |
 | Libraries (crates.io) | `false` (users choose) |
 
 ## Measuring Impact
 
 ```bash
-# Build without LTO
+# Set lto = "off" in Cargo.toml for the no-LTO comparison
 cargo build --release
 hyperfine ./target/release/myapp
 

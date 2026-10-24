@@ -127,7 +127,7 @@ Or selectively:
 
 ```toml
 [lints.clippy]
-cargo = "warn"
+cargo = { level = "warn", priority = -1 }
 multiple_crate_versions = "allow"  # Acceptable in this project
 ```
 

@@ -70,7 +70,7 @@ pub use model::User;
 
 - Module declaration outside directory
 - Can see module's interface without entering folder
-- Matches Rust 2018+ default lint preference
+- Supported alongside mod.rs since Rust 1.30; neither style is deprecated
 - Good for small modules with few submodules
 
 ## Example: Complex Module
@@ -105,12 +105,12 @@ pub use queries::{UserQueries, OrderQueries};
 
 Pick one style for your project and stick with it:
 
-```rust
-// Cargo.toml or clippy.toml
+```toml
+# Cargo.toml — choose one of these opposing policies
 [lints.clippy]
-mod_module_files = "warn"  # Enforces mod.rs style
-# OR
-self_named_module_files = "warn"  # Enforces adjacent style
+self_named_module_files = "warn"  # Requires mod.rs style
+# OR, instead of the setting above:
+# mod_module_files = "warn"  # Bans mod.rs; requires adjacent named files
 ```
 
 ## See Also

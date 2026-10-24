@@ -90,7 +90,7 @@ fn test_with_shared_config() {
 ## Organizing Many Tests
 
 ```rust
-// tests/api/mod.rs
+// tests/api/main.rs — automatically discovered integration-test entry point
 mod auth;
 mod users;
 mod orders;
@@ -110,6 +110,8 @@ use my_crate::users::{create_user, get_user};
 #[test]
 fn test_create_user() { ... }
 ```
+
+Cargo discovers `tests/api.rs` or `tests/api/main.rs`; a nested `tests/api/mod.rs` alone is only a possible helper module and is not an entry point. An explicit `[[test]]` target can also select a different path.
 
 ## Integration vs Unit Tests
 

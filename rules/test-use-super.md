@@ -14,7 +14,8 @@ The test module is a child of the module being tested. `use super::*` imports al
 mod tests {
     use crate::my_module::public_function;
     use crate::my_module::MyStruct;
-    // Can't access private items this way!
+    // Explicit paths can also access private parent items from a child test
+    // module; use super::* is a convenience, not a visibility override.
     
     #[test]
     fn test_function() {

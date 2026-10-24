@@ -33,6 +33,7 @@ fn divide(numerator: u32, denominator: NonZeroU32) -> u32 {
 }
 
 // ID is guaranteed non-zero; Option<WidgetId> is free
+#[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct WidgetId(NonZeroU32);
 
@@ -77,6 +78,12 @@ mod tests {
         let denom = NonZeroU32::new(3).unwrap();
         assert_eq!(divide(12, denom), 4);
     }
+
+    #[test]
+    fn documented_niches_have_no_extra_tag() {
+        assert_eq!(size_of::<Option<WidgetId>>(), size_of::<u32>());
+        assert_eq!(size_of::<Result<NonZeroU32, ()>>(), size_of::<u32>());
+    }
 }
 ```
 
@@ -86,7 +93,7 @@ mod tests {
 - **Construction**: `NonZeroU32::new(n) -> Option<NonZeroU32>`. Use `NonZeroU32::new(n).expect("n must be non-zero")` only at well-verified program boundaries, not in production fallible paths.
 - **Access**: `.get()` returns the inner primitive value.
 - **Arithmetic**: `NonZeroU32` does not implement `Add`/`Sub` directly (the result could be zero). Extract with `.get()`, do arithmetic, and reconstruct with `NonZeroU32::new(result)?`.
-- **Niche optimization** applies to `Option` and `Result`: the compiler stores the `None`/`Err` discriminant in the zero bit-pattern, so no extra word is needed. This also applies to custom newtypes that wrap `NonZero*`.
+- **Niche optimization** guarantees that `Option<NonZeroU32>` has the size/alignment of `u32`, including eligible `#[repr(transparent)]` wrappers. For `Result`, the other variant must meet the documented conditions: for example, `Result<NonZeroU32, ()>` can use the zero niche, but arbitrary payloads such as an error `u32` require additional representation. See the [Result representation guarantees](https://doc.rust-lang.org/std/result/index.html#representation); do not generalize this to every error type or default-layout newtype.
 
 ## See Also
 

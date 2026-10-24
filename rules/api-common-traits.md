@@ -21,8 +21,9 @@ println!("{:?}", point);  // Error: Debug not implemented
 // Can't compare
 if point1 == point2 { }  // Error: PartialEq not implemented
 
-// Can't use in HashMap
-let mut map: HashMap<Point, Value> = HashMap::new();  // Error: Hash not implemented
+// Creating an empty HashMap does not require Eq or Hash.
+let mut map: HashMap<Point, Value> = HashMap::new();
+map.insert(point, value);  // Error: Point lacks Eq + Hash
 
 // Can't clone
 let copy = point.clone();  // Error: Clone not implemented
@@ -37,7 +38,7 @@ pub struct Point {
     pub y: f64,
 }
 
-// Now everything works
+// Debug, comparison, and copying now work (f64 still does not implement Eq).
 println!("{:?}", point);
 assert_eq!(point1, point2);
 let copy = point;  // Copy, not just Clone
@@ -53,7 +54,7 @@ let mut map: HashMap<UserId, User> = HashMap::new();
 
 | Trait | Derive When | Requirements |
 |-------|-------------|--------------|
-| `Debug` | Always for public types | All fields implement Debug |
+| `Debug` | Fields are suitable for diagnostics | All fields implement Debug; use a manual redacting impl for secrets |
 | `Clone` | Type can be duplicated | All fields implement Clone |
 | `Copy` | Small, simple types | All fields implement Copy, no Drop |
 | `PartialEq` | Comparison makes sense | All fields implement PartialEq |
@@ -93,6 +94,9 @@ pub enum ParseError {
 
 ```rust
 // When derive doesn't do what you want
+use std::fmt::{self, Debug};
+use std::hash::{Hash, Hasher};
+
 struct CaseInsensitiveString(String);
 
 impl PartialEq for CaseInsensitiveString {
@@ -133,7 +137,7 @@ pub struct ApiResponse {
 }
 
 // With custom serialization
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Config {
     #[serde(default)]
     pub verbose: bool,
@@ -141,12 +145,22 @@ pub struct Config {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_key: Option<String>,
 }
+
+impl std::fmt::Debug for Config {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Config")
+            .field("verbose", &self.verbose)
+            .field("api_key", &self.api_key.as_ref().map(|_| "[REDACTED]"))
+            .finish()
+    }
+}
 ```
 
 ## Minimum Recommended
 
 ```rust
-// At minimum, public types should have:
+// Common starting point when duplication and comparison fit the type.
+// Implement Debug manually instead if fields need redaction.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MyType { ... }
 

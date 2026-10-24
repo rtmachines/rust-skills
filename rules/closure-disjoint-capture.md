@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Before the 2021 edition, a closure captured entire variables — using `config.threshold` pulled in the whole `config` struct, preventing other code from using any other field of `config` concurrently. Since Rust 2021, closures capture individual fields (`config.threshold` only), so sibling fields remain independently accessible. Take advantage of this: write closures that reference only the specific fields or values they need, and add `move` only when ownership is genuinely required. When you do need to `move` a single field, bind it to a local first so the rest of the struct stays usable.
+Before the 2021 edition, closures captured whole variables rather than disjoint fields; moving or exclusively borrowing an aggregate could block access to sibling fields. Since Rust 2021, closures can capture individual fields, including in `move` closures. Reference only the fields you need. Binding a field to a local can make captures explicit, but is not required for a precise `move` capture.
 
 ## Bad
 
@@ -17,19 +17,13 @@ struct Config {
 fn demo_bad() {
     let config = Config { threshold: 10, label: String::from("demo") };
 
-    // In pre-2021 editions the whole `config` is captured, blocking access
-    // to `config.label` below. In 2021 this compiles, but the pattern of
-    // capturing the whole struct via `move` is the real footgun:
-    let threshold = config.threshold; // copy out the field first
-    let check = move || threshold > 0; // now `config` is NOT fully moved
+    // Using the whole struct captures it, even in edition 2021+.
+    fn check_config(config: &Config) -> bool { config.threshold > 0 }
+    let check = move || check_config(&config);
 
-    // If instead you wrote: let check = move || config.threshold > 0;
-    // `config` would be moved in, making `config.label` inaccessible afterwards.
-    // Demonstrate the problematic pattern (commented out to allow compilation):
-    // let check2 = move || config.threshold > 0;
+    // Access after the whole-struct move is an error:
     // println!("{}", config.label); // error: use of moved value
 
-    println!("label still accessible: {}", config.label);
     assert!(check());
 }
 ```
@@ -54,11 +48,9 @@ fn demo_good() {
     assert!(check());
 }
 
-// When you need `move` for one field, bind it first.
+// `move` also captures disjoint fields in edition 2021+.
 fn make_checker(config: Config) -> (impl Fn() -> bool, String) {
-    // Bind the field to a local, then move only that local into the closure.
-    let threshold = config.threshold;
-    let checker = move || threshold > 0; // moves `threshold` (i32, Copy), not `config`
+    let checker = move || config.threshold > 0;
 
     // `config.label` is still available here.
     (checker, config.label)
@@ -75,9 +67,9 @@ fn demo_bind_first() {
 ## Key Points
 
 - **Edition 2021 rule:** closures capture the *minimal* path used — `foo.bar` rather than `foo`. This reduces spurious borrow conflicts.
-- **`move` captures the whole named place.** Writing `move || self.field` inside a method moves `*self`, not just `self.field`. Bind to a local to narrow the capture.
+- **`move` changes how captures are taken, not the field-precision rule.** `move || config.threshold > 0` can capture just that field. Using `&config` captures the aggregate; dereferences and other capture-precision limits also matter.
 - **Copy types** (integers, booleans) are copied into the closure rather than moved, so the original remains valid even with `move`.
-- **Borrow by reference first:** only escalate to `move` when the closure must outlive the scope (see [closure-move-capture](closure-move-capture.md)).
+- **Borrow when suitable:** use `move` when the closure needs ownership of its captures. Moving a reference does not extend the referent's lifetime (see [closure-move-capture](closure-move-capture.md)).
 
 ## See Also
 

@@ -67,9 +67,9 @@ impl Widget {
 |------------|-----------------|
 | `pub` | Everywhere |
 | `pub(crate)` | Current crate only |
-| `pub(super)` | Parent module only |
-| `pub(in path)` | Specific module path |
-| (private) | Current module only |
+| `pub(super)` | Parent module and its descendants |
+| `pub(in path)` | Named ancestor module and its descendants |
+| (private) | Defining module and its descendants |
 
 ## Pattern: Internal Module
 

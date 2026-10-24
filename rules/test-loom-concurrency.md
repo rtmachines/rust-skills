@@ -1,32 +1,52 @@
 # test-loom-concurrency
 
-> Use `loom` to exhaustively test lock-free and concurrent code
+> Use `loom` to explore bounded models of lock-free and concurrent code
 
 ## Why It Matters
 
-Probabilistic stress tests can run millions of iterations and still miss a race condition that only manifests under a specific thread interleaving. `loom` systematically explores every thread scheduling and memory-reordering permitted by the C11 memory model, turning "we ran it a lot and it seemed fine" into a proof of correctness for the interleavings that exist within the model bounds. Tokio uses loom to verify its internal synchronization primitives.
+Stress tests can miss an interleaving despite many runs. Loom systematically explores the schedules and memory behaviors that its instrumented operations and configured model bounds represent. A successful model run is evidence about that model, not a proof of every production execution or every behavior allowed by the C11 memory model. Loom has modeling limitations, including incomplete coverage of some relaxed-memory behaviors. Tokio uses Loom to check synchronization primitives.
 
 ## Bad
 
 ```rust
-// Stress test: might pass a billion times, still doesn't prove correctness
+// Repeated OS-scheduled runs do not establish coverage of every interleaving.
 #[test]
 fn stress_test_flag() {
     use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
     let flag = Arc::new(AtomicBool::new(false));
-    for _ in 0..1_000_000 {
-        let flag = Arc::clone(&flag);
-        std::thread::spawn(move || {
-            flag.store(true, Ordering::Relaxed);
-        });
-    }
-    // races may never surface under the OS scheduler used here
+    let other = Arc::clone(&flag);
+    let writer = std::thread::spawn(move || {
+        other.store(true, Ordering::Relaxed);
+    });
+    writer.join().unwrap();
+    assert!(flag.load(Ordering::Relaxed));
 }
 ```
 
+This test checks a post-join result; neither repeated success nor a join establishes that a separate publication protocol has correct memory ordering.
+
 ## Good
 
-Gate concurrent primitives behind `#[cfg(loom)]` so the same code runs with loom's instrumented types during model checking and with std types in production:
+Use instrumented primitives under a dedicated model-checking configuration. The minimal fixture below uses a normal Loom dependency because the library itself is compiled with Loom types. A larger production project can keep this setup in a separate verification crate.
+
+```toml
+# Cargo.toml
+[package]
+name = "my-crate"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+loom = "0.7"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }
+```
+
+```rust
+// src/lib.rs
+pub mod flag;
+```
 
 ```rust
 // src/flag.rs
@@ -38,6 +58,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 pub struct Flag(AtomicBool);
 
 impl Flag {
+    // Loom's constructor is not const.
+    #[cfg(loom)]
+    pub fn new() -> Self {
+        Self(AtomicBool::new(false))
+    }
+
+    #[cfg(not(loom))]
     pub const fn new() -> Self {
         Self(AtomicBool::new(false))
     }
@@ -53,50 +80,50 @@ impl Flag {
 ```
 
 ```rust
-// tests/loom_flag.rs  (or inside a #[cfg(loom)] mod in the crate)
-#[cfg(loom)]
-mod tests {
-    use loom::sync::Arc;
-    use super::Flag;
+// tests/loom_flag.rs — a separate crate imports the library by its crate name.
+#![cfg(loom)]
 
-    #[test]
-    fn flag_set_visible_to_other_thread() {
-        loom::model(|| {
-            let flag = Arc::new(Flag::new());
+use loom::sync::Arc;
+use my_crate::flag::Flag;
 
-            let flag2 = Arc::clone(&flag);
-            let writer = loom::thread::spawn(move || {
-                flag2.set();
-            });
+#[test]
+fn flag_is_set_after_writer_joins() {
+    loom::model(|| {
+        let flag = Arc::new(Flag::new());
+        let other = Arc::clone(&flag);
+        let writer = loom::thread::spawn(move || other.set());
 
-            // All interleavings: either writer runs first or reader does.
-            // loom verifies the Acquire/Release pair holds in both cases.
-            let seen = flag.is_set();
-            writer.join().unwrap();
-
-            // After join, writer must have completed; flag must be set.
-            assert!(flag.is_set(), "flag must be set after join");
-            // 'seen' may be false if reader ran before writer — that is valid.
-            let _ = seen;
-        });
-    }
+        // Before join, either result is valid.
+        let _seen = flag.is_set();
+        writer.join().unwrap();
+        assert!(flag.is_set(), "flag must be set after join");
+    });
 }
 ```
 
-Run loom tests with the feature flag:
+This small model demonstrates constructor adaptation, instrumented atomics, and thread scheduling. Because the assertion follows `join`, it does not distinguish Release/Acquire from Relaxed or verify publication of a separate payload. Test a real payload/ordering invariant when that is the algorithm's contract.
+
+Run with the custom cfg (it is not a Cargo feature):
 
 ```bash
 RUSTFLAGS="--cfg loom" cargo test --test loom_flag
 ```
 
+Also check the ordinary configuration:
+
+```bash
+cargo test
+```
+
 ## Key Points
 
-- Keep loom model closures **small**: combinatorial explosion grows with the number of atomic operations and threads. Test one primitive or algorithm at a time.
-- loom replaces `std::sync::atomic`, `std::sync::Mutex`, `std::thread`, and `std::cell` with instrumented equivalents — import from `loom::` under `#[cfg(loom)]`.
-- Use `loom::model(|| { ... })` as the entry point; loom runs the closure repeatedly under different schedules.
-- loom checks the C11 model — it does not detect logical bugs unrelated to concurrency.
+- Keep model closures small and record any preemption, branch, permutation, or time bounds used.
+- Replace the synchronization and shared-memory operations that the model must observe with Loom's instrumented equivalents; uninstrumented std operations are outside that model.
+- Use `loom::model` as the entry point, and ensure instrumented objects are created inside it.
+- Check Loom's documented memory-model limitations rather than equating a passing run with exhaustive C11 coverage.
+- Model the actual invariant; joins and unrelated synchronization can hide the ordering defect you intended to test.
 
 ## See Also
 
-- [conc-atomic-ordering](conc-atomic-ordering.md) - choose correct memory orderings
-- [test-criterion-bench](test-criterion-bench.md) - benchmark concurrent code after verifying correctness
+- [conc-atomic-ordering](conc-atomic-ordering.md) - Choose correct memory orderings
+- [test-criterion-bench](test-criterion-bench.md) - Benchmark after correctness checks

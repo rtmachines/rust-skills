@@ -94,13 +94,15 @@ fn demo() {
 | Feature | Allowed in `dyn Trait`? |
 |---|---|
 | `&self` / `&mut self` methods | Yes |
-| Methods returning `Self` by value | No — use `Box<Self>` or gate with `where Self: Sized` |
+| Methods returning `Self` or `Box<Self>` | No — use an erased result such as `Box<dyn Trait>`, or gate with `where Self: Sized` |
 | Generic method parameters (`fn f<T>`) | No — gate with `where Self: Sized` |
 | Associated constants | No |
 | Associated types | Yes (type is erased but fixed per impl) |
 | `where Self: Sized` methods | Excluded from vtable, safe to have |
 
-See the Rust Reference — "Object Safety" — at doc.rust-lang.org/reference/items/traits.html#object-safety for the full rules.
+A receiver `self: Box<Self>` is supported; a return type `Box<Self>` still mentions the implementing type outside the receiver and is not dispatchable. Use `Box<dyn Trait>` only when an owned, erased result fits the API.
+
+See the Rust Reference — "Dyn compatibility" — at doc.rust-lang.org/reference/items/traits.html#dyn-compatibility for the full rules.
 
 ## See Also
 

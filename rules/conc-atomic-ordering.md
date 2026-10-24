@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Defaulting to `SeqCst` (sequentially consistent) on every atomic is a common correctness-first shortcut, but it carries real cost: on x86 the difference is small, but on ARM and RISC-V weaker orderings map to cheaper instructions while `SeqCst` requires full memory barriers. More importantly, choosing the wrong ordering — even a weaker one — is a correctness bug that causes data races the compiler won't catch. Understanding the four practical levels lets you write both correct and efficient concurrent code.
+Choose memory ordering from the synchronization proof, then measure performance. Instruction and barrier costs depend on the operation, target and compiler; `SeqCst` does not universally insert a full barrier. Incorrect ordering can expose stale state or permit data races in non-atomic data. Stronger ordering alone does not repair an incorrect ownership or publication protocol.
 
 ## Bad
 
@@ -13,21 +13,21 @@ use std::sync::atomic::{AtomicU64, AtomicBool, Ordering};
 
 static COUNTER: AtomicU64 = AtomicU64::new(0);
 static READY: AtomicBool = AtomicBool::new(false);
-static mut DATA: u64 = 0;
+static DATA: AtomicU64 = AtomicU64::new(0);
 
-// SeqCst everywhere — correct, but unnecessarily expensive
+// Stronger ordering than an independent counter needs; measure its cost.
 fn increment() {
     COUNTER.fetch_add(1, Ordering::SeqCst);
 }
 
 fn producer() {
-    unsafe { DATA = 42; }
+    DATA.store(42, Ordering::SeqCst);
     READY.store(true, Ordering::SeqCst); // overkill for a single flag
 }
 
 fn consumer() -> Option<u64> {
     if READY.load(Ordering::SeqCst) {
-        Some(unsafe { DATA })
+        Some(DATA.load(Ordering::SeqCst))
     } else {
         None
     }
@@ -50,7 +50,8 @@ fn total() -> u64 {
     COUNTER.load(Ordering::Relaxed)
 }
 
-// Acquire/Release: paired handoff — producer writes data THEN sets flag (Release);
+// One-shot handoff: call producer once; reusing the slot needs another protocol.
+// Acquire/Release: producer writes data THEN sets flag (Release);
 // consumer loads flag (Acquire) and is guaranteed to see the preceding write.
 static READY: AtomicBool = AtomicBool::new(false);
 static VALUE: AtomicU64 = AtomicU64::new(0);
@@ -84,7 +85,7 @@ fn consumer() -> Option<u64> {
 
 ## Verification with loom
 
-Use the `loom` crate to exhaustively verify ordering choices for small concurrent units — it explores all interleavings the C11 memory model permits:
+Use `loom` to explore executions of small instrumented concurrent models. It checks interleavings within its model and configured exploration bounds, with documented limitations on memory-model coverage. Passing a model does not prove every C11-permitted reordering or every production execution correct. Use Loom's synchronization types for the operations being modeled and retain a manual ordering proof:
 
 ```rust
 #[cfg(loom)]
@@ -102,5 +103,5 @@ fn test_handoff() {
 ## See Also
 
 - [own-mutex-interior](own-mutex-interior.md) - prefer `Mutex<T>` when lock-free isn't required
-- [test-loom-concurrency](test-loom-concurrency.md) - exhaustively test concurrent code with loom
+- [test-loom-concurrency](test-loom-concurrency.md) - model concurrent code with loom and record exploration limits
 - [conc-scoped-threads](conc-scoped-threads.md) - safely share stack data across threads

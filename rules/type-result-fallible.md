@@ -34,22 +34,28 @@ fn divide(a: i32, b: i32) -> i32 {
 // Result with clear error type
 fn read_config(path: &str) -> Result<Config, ConfigError> {
     let content = std::fs::read_to_string(path)
-        .map_err(ConfigError::IoError)?;
+        .map_err(ConfigError::Io)?;
     toml::from_str(&content)
-        .map_err(ConfigError::ParseError)
+        .map_err(ConfigError::Parse)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DivisionError {
+    DivideByZero,
+    Overflow,
 }
 
 fn divide(a: i32, b: i32) -> Result<i32, DivisionError> {
     if b == 0 {
         return Err(DivisionError::DivideByZero);
     }
-    Ok(a / b)
+    a.checked_div(b).ok_or(DivisionError::Overflow)
 }
 
 // Caller must handle
 match divide(10, 0) {
     Ok(result) => println!("Result: {}", result),
-    Err(e) => println!("Error: {}", e),
+    Err(e) => println!("Error: {:?}", e),
 }
 ```
 

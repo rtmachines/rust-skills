@@ -106,6 +106,9 @@ let cpu_runtime = Builder::new_multi_thread()
 
 ```rust
 // Separate runtimes for different workloads
+use std::future::Future;
+use tokio::runtime::{Builder, Runtime};
+
 struct App {
     io_runtime: Runtime,
     cpu_runtime: Runtime,
@@ -117,6 +120,7 @@ impl App {
             io_runtime: Builder::new_multi_thread()
                 .worker_threads(8)
                 .thread_name("io-worker")
+                .enable_all() // Network I/O and timers used by these tasks
                 .build()
                 .unwrap(),
             cpu_runtime: Builder::new_multi_thread()
@@ -127,19 +131,21 @@ impl App {
         }
     }
     
-    fn spawn_io<F>(&self, future: F) 
-    where F: Future + Send + 'static, F::Output: Send + 'static 
+    fn spawn_io<F>(&self, future: F) -> tokio::task::JoinHandle<F::Output>
+    where F: Future + Send + 'static, F::Output: Send + 'static
     {
-        self.io_runtime.spawn(future);
+        self.io_runtime.spawn(future)
     }
     
-    fn spawn_cpu<F>(&self, task: F) 
-    where F: FnOnce() + Send + 'static 
+    fn spawn_cpu<F>(&self, task: F) -> tokio::task::JoinHandle<()>
+    where F: FnOnce() + Send + 'static
     {
-        self.cpu_runtime.spawn_blocking(task);
+        self.cpu_runtime.spawn_blocking(task)
     }
 }
 ```
+
+Retain and await the returned handles; dropping a handle detaches its task. Shut down owned runtimes from a synchronous owner after their tasks finish. In this example, `worker_threads` configures async workers, not the separate `spawn_blocking` thread limit; bound CPU-work admission independently.
 
 ## Runtime in Tests
 

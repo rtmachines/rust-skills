@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Rust iterators are lazy—they compute values on demand. This enables single-pass processing, avoids intermediate allocations, and allows short-circuiting. Calling `.collect()` too early forces evaluation and allocates unnecessarily.
+Rust iterators are lazy—they compute values on demand. This enables single-pass processing, avoids intermediate allocations, and allows short-circuiting. Calling `.collect()` too early forces evaluation and may allocate unnecessarily. Owning Vec iterator pipelines can sometimes reuse their original buffer; that does not remove the extra collecting stages or eager evaluation.
 
 ## Bad
 
@@ -13,11 +13,11 @@ Rust iterators are lazy—they compute values on demand. This enables single-pas
 fn process(data: Vec<i32>) -> Vec<i32> {
     let filtered: Vec<_> = data.into_iter()
         .filter(|x| *x > 0)
-        .collect();  // Unnecessary allocation
+        .collect();  // Extra materialization; an owning Vec iterator may reuse its allocation
     
     let mapped: Vec<_> = filtered.into_iter()
         .map(|x| x * 2)
-        .collect();  // Another unnecessary allocation
+        .collect();  // Another collecting stage; allocation reuse is implementation-dependent
     
     mapped.into_iter()
         .take(10)

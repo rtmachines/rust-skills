@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-When running multiple fallible operations concurrently, `try_join!` returns `Err` as soon as any future fails, without waiting for the others. This provides fail-fast behavior while still running operations in parallel. For many operations, use `futures::future::try_join_all`.
+When running multiple fallible operations concurrently, `try_join!` returns `Err` as soon as any future fails, without waiting for the others. This provides fail-fast behavior while polling the operations concurrently on the same task. Blocking one branch prevents the other branches from being polled. For many operations, use `futures::future::try_join_all`.
 
 ## Bad
 
@@ -17,7 +17,7 @@ async fn fetch_all() -> Result<(A, B, C)> {
     Ok((a, b, c))
 }
 
-// join! ignores errors
+// join! returns each result separately; the caller must handle the errors
 async fn fetch_all() -> (Result<A>, Result<B>, Result<C>) {
     let (a, b, c) = join!(fetch_a(), fetch_b(), fetch_c());
     // All complete even if first one failed
@@ -56,7 +56,9 @@ async fn fetch_users(ids: &[u64]) -> Result<Vec<User>> {
 ## Error Handling Patterns
 
 ```rust
-// Different error types - need common error type
+// Different error types - need a common error type
+use futures::TryFutureExt;
+
 async fn mixed_operations() -> Result<(A, B), Error> {
     let (a, b) = try_join!(
         fetch_a().map_err(Error::from),  // Convert errors
@@ -94,8 +96,9 @@ async fn best_effort(ids: &[u64]) -> Vec<User> {
 // try_join! cancels remaining futures on error
 async fn with_cancellation() -> Result<()> {
     // If fetch_a() fails, fetch_b() and fetch_c() are dropped
-    // But "dropped" != "immediately stopped"
-    // They stop at their next .await point
+    // Remaining owned futures are dropped before try_join! returns.
+    // Their async cleanup may never run. Dropping wrappers does not undo
+    // submitted I/O or stop independently spawned/blocking work.
     
     try_join!(
         async {
@@ -113,7 +116,8 @@ async fn with_cancellation() -> Result<()> {
     Ok(())
 }
 
-// For guaranteed cleanup, use Drop guards or explicit handling
+// Drop guards can do synchronous cleanup. For async cleanup, keep an explicit
+// owner, signal its task and await completion; do not rely on a dropped future.
 ```
 
 ## With Timeout
@@ -121,27 +125,35 @@ async fn with_cancellation() -> Result<()> {
 ```rust
 use tokio::time::{timeout, Duration};
 
-async fn fetch_with_timeout() -> Result<(A, B)> {
+async fn fetch_with_timeout() -> Result<(A, B), Error> {
+    // timeout takes a future, not the Result produced by try_join!.
+    // The outer Result is timeout vs completion; the inner one is the operation.
     timeout(
         Duration::from_secs(10),
-        try_join!(fetch_a(), fetch_b())
+        async { tokio::try_join!(fetch_a(), fetch_b()) },
     )
     .await
     .map_err(|_| Error::Timeout)?
 }
 
-// Per-operation timeout
-async fn individual_timeouts() -> Result<(A, B)> {
-    try_join!(
-        timeout(Duration::from_secs(5), fetch_a())
-            .map_err(|_| Error::Timeout)
-            .and_then(|r| async { r }),
-        timeout(Duration::from_secs(5), fetch_b())
-            .map_err(|_| Error::Timeout)
-            .and_then(|r| async { r }),
+// Per-operation deadlines, with both error layers handled explicitly.
+async fn individual_timeouts() -> Result<(A, B), Error> {
+    tokio::try_join!(
+        async {
+            timeout(Duration::from_secs(5), fetch_a())
+                .await
+                .map_err(|_| Error::Timeout)?
+        },
+        async {
+            timeout(Duration::from_secs(5), fetch_b())
+                .await
+                .map_err(|_| Error::Timeout)?
+        },
     )
 }
 ```
+
+Here `fetch_a` and `fetch_b` each return `Result<_, Error>`, and `Error` includes `Timeout`. Timeout drops its owned future; submitted external work may still continue. Decide whether that operation needs a separate cancellation and completion protocol.
 
 ## try_join! vs FuturesUnordered
 

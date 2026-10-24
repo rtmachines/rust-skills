@@ -102,8 +102,9 @@ async fn select_example() {
     }
 }
 
-// Futures are cancelled at their next .await point
-// For immediate cancellation, futures must be cancel-safe
+// Remaining owned futures are dropped as select! returns; they are no longer polled.
+// Cancellation safety concerns partial progress and effects, not delayed destruction.
+// A borrowed future, detached task or submitted blocking I/O may outlive the race.
 ```
 
 ## Biased Selection
@@ -135,12 +136,11 @@ async fn event_loop(
                 println!("Shutting down");
                 break;
             }
-            Some(cmd) = commands.recv() => {
-                process_command(cmd).await;
-            }
-            else => {
-                // commands channel closed
-                break;
+            command = commands.recv() => {
+                match command {
+                    Some(cmd) => process_command(cmd).await,
+                    None => break, // All senders gone and queued commands consumed
+                }
             }
         }
     }

@@ -44,7 +44,7 @@ fn clamp_score(score: i64) -> i64 {
 
 // float clamp: available on f32/f64 since Rust 1.50
 fn normalize_alpha(a: f32) -> f32 {
-    a.clamp(0.0, 1.0)  // NaN propagates: NaN.clamp(0.0, 1.0) == NaN
+    a.clamp(0.0, 1.0)  // NaN propagates; check the result with is_nan(), not ==
 }
 
 #[cfg(test)]
@@ -75,13 +75,19 @@ mod tests {
     fn float_nan_propagates_through_clamp() {
         assert!(f32::NAN.clamp(0.0, 1.0).is_nan());
     }
+
+    #[test]
+    fn invalid_float_bounds_panic() {
+        assert!(std::panic::catch_unwind(|| 1.0_f64.clamp(f64::NAN, 2.0)).is_err());
+        assert!(std::panic::catch_unwind(|| 1.0_f64.clamp(2.0, 0.0)).is_err());
+    }
 }
 ```
 
 ## Key Points
 
-- **`clamp` panics if `min > max`** — this is a programming error and is caught in debug builds. If `min`/`max` come from user input, validate their order first.
-- **`f32`/`f64` `clamp`** propagates `NaN`: if `self` is `NaN`, the result is `NaN`. If `min` or `max` is `NaN`, the result is unspecified. Filter `NaN` before calling `clamp` on untrusted floats.
+- **`clamp` panics if `min > max`**, in both debug and release builds. If bounds come from user input, validate them and return a controlled error when invalid.
+- **`f32`/`f64` `clamp`** also panics when either bound is NaN. With valid bounds, NaN as the value being clamped propagates to the result. Validate bounds separately from the application's policy for NaN input values.
 - **Saturating vs. clamping**: `saturating_*` applies to a single arithmetic operation and stops at the type's absolute limits (`i32::MIN`/`i32::MAX`). `clamp` applies to the final value and accepts arbitrary bounds. They compose well, as shown in `apply_damage`.
 - The standard library docs for `clamp` are at `std::cmp::Ord::clamp` and `f32::clamp`.
 

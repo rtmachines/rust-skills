@@ -80,6 +80,7 @@ pub fn parse(input: &str) -> ParseResult {
 /// let config = Config::builder()
 ///     .timeout(30)
 ///     .build()?;
+/// # Ok::<(), my_crate::ConfigError>(())
 /// ```
 ///
 /// # Methods

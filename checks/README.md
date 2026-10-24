@@ -1,5 +1,22 @@
 # checks — compile-verify the rule examples
 
+## Corrected local edition
+
+Focused regression suites for the local corrections live in
+[`regressions/`](regressions/README.md). They extract selected current Markdown
+examples, supply explicitly described scaffolding, and exercise the corrected
+boundaries. Read [../LOCAL_CHANGES.md](../LOCAL_CHANGES.md) for executed checks,
+exact versions and remaining verification limits.
+
+The original extraction/classification workflow below is preserved. Its baseline
+is a legacy list of accepted diagnostics, not evidence that every example is
+correct. It was not regenerated to accept the corrected edition's failures.
+The full legacy suite could not run in this local environment: Rust 1.95.0 was
+not installed, and an offline attempt with Rust 1.99.0 stopped before compilation
+because the locked `anyhow 1.0.102` was unavailable in the cache.
+
+## Original workflow
+
 A dev tool that type-checks the ` ```rust ` code blocks in `../rules/*.md` so the
 "Good" examples we tell agents to write actually compile. Not part of the
 published skill.

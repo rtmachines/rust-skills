@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Unbounded channels grow without limit when producers outpace consumers. In production, this leads to memory exhaustion. Bounded channels apply backpressure—producers wait when the channel is full, naturally throttling the system. This prevents OOM and makes resource usage predictable.
+Unbounded channels grow without limit when producers outpace consumers. In production, this leads to memory exhaustion. Bounded channels apply backpressure—producers wait when the channel is full, naturally throttling the system. This bounds queued message count. Also bound payload sizes, pending producers and active tasks before claiming a global memory or OOM bound.
 
 ## Bad
 
@@ -18,7 +18,7 @@ let (tx, mut rx) = mpsc::unbounded_channel::<Message>();
 tokio::spawn(async move {
     loop {
         let msg = generate_message();
-        tx.send(msg).unwrap();  // Never blocks, never fails (until OOM)
+        tx.send(msg).unwrap();  // No capacity backpressure; Err if the receiver is gone
     }
 });
 
@@ -42,7 +42,7 @@ let (tx, mut rx) = mpsc::channel::<Message>(100);  // Max 100 items
 tokio::spawn(async move {
     loop {
         let msg = generate_message();
-        // Blocks if channel is full - natural backpressure
+        // Suspends if the channel is full - natural backpressure
         tx.send(msg).await.unwrap();
     }
 });
@@ -52,7 +52,7 @@ tokio::spawn(async move {
         slow_process(msg).await;
     }
 });
-// Memory usage capped at ~100 messages
+// Queue capacity is 100 messages; producers and active work need separate bounds.
 ```
 
 ## Choosing Buffer Size
@@ -137,7 +137,13 @@ let (tx, rx) = watch::channel::<State>(initial);
 ## Worker Pool Pattern
 
 ```rust
-async fn process_with_workers(items: Vec<Item>) -> Vec<Result> {
+use std::sync::Arc;
+use tokio::sync::{mpsc, Mutex};
+
+// process(item) returns Output. The caller owns and joins every worker.
+async fn process_with_workers(
+    items: Vec<Item>,
+) -> Result<Vec<Output>, tokio::task::JoinError> {
     let (tx, rx) = mpsc::channel(100);
     let rx = Arc::new(Mutex::new(rx));
     
@@ -145,26 +151,49 @@ async fn process_with_workers(items: Vec<Item>) -> Vec<Result> {
     let workers: Vec<_> = (0..4).map(|_| {
         let rx = rx.clone();
         tokio::spawn(async move {
+            let mut outputs = Vec::new();
             loop {
                 let item = {
+                    // mpsc has one Receiver. The async mutex serializes receiving,
+                    // including its await; it is released before processing.
                     let mut rx = rx.lock().await;
                     rx.recv().await
                 };
                 match item {
-                    Some(item) => process(item).await,
+                    Some(item) => outputs.push(process(item).await),
                     None => break,
                 }
             }
+            outputs
         })
     }).collect();
     
+    // The supervisor must not keep a spare Receiver owner alive if all workers fail.
+    drop(rx);
+
     // Send items
     for item in items {
-        tx.send(item).await.unwrap();
+        if tx.send(item).await.is_err() {
+            break; // Every worker ended; still join them below to observe failure
+        }
     }
-    drop(tx);  // Signal workers to stop
-    
-    futures::future::join_all(workers).await;
+    drop(tx); // Signal workers to stop after consuming queued work
+
+    // join_all waits for every handle before we propagate a worker failure.
+    let joined = futures::future::join_all(workers).await;
+    let mut outputs = Vec::new();
+    let mut first_error = None;
+    for result in joined {
+        match result {
+            Ok(worker_outputs) => outputs.extend(worker_outputs),
+            Err(error) if first_error.is_none() => first_error = Some(error),
+            Err(_) => {}
+        }
+    }
+    match first_error {
+        Some(error) => Err(error),
+        None => Ok(outputs), // Grouped by worker, not original input order
+    }
 }
 ```
 

@@ -71,9 +71,12 @@ fn reuse_buffer() {
 ## Pattern: Batch Processing
 
 ```rust
-fn process_in_chunks(mut items: Vec<Item>, chunk_size: usize) {
+use std::num::NonZeroUsize;
+
+// A zero-sized chunk would never remove an item; reject it at construction.
+fn process_in_chunks(mut items: Vec<Item>, chunk_size: NonZeroUsize) {
     while !items.is_empty() {
-        let chunk: Vec<_> = items.drain(..chunk_size.min(items.len())).collect();
+        let chunk: Vec<_> = items.drain(..chunk_size.get().min(items.len())).collect();
         process_chunk(chunk);
     }
 }

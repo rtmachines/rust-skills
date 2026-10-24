@@ -1,0 +1,3387 @@
+{
+  "base_commit": "fd2a861ab0406a4ac536a55274d14ea6fd1ca9c9",
+  "local_version": "1.5.1+local.1",
+  "verification": {
+    "base_commit": "fd2a861ab0406a4ac536a55274d14ea6fd1ca9c9",
+    "date": "2026-10-23",
+    "findings_corrected": 101,
+    "rules_total": 265,
+    "changed_rule_files": 109,
+    "checks": [
+      {
+        "name": "structure",
+        "exit_code": 0,
+        "command": [
+          "python",
+          "checks/validate.py"
+        ]
+      },
+      {
+        "name": "index",
+        "exit_code": 0,
+        "command": [
+          "python",
+          "checks/gen_index.py",
+          "--check"
+        ]
+      },
+      {
+        "name": "diff-whitespace",
+        "exit_code": 0,
+        "command": [
+          "git",
+          "diff",
+          "--check"
+        ]
+      }
+    ],
+    "original_repository_pristine": true,
+    "core": {
+      "debug_passed": 38,
+      "release_passed": 38,
+      "simd_tests_passed": 1,
+      "simd_offset_length_combinations": 2560
+    },
+    "api": {
+      "compile_checks": 27,
+      "expected_acceptances": 16,
+      "expected_rejections": 11,
+      "execution_tests": 22
+    },
+    "runtime": {
+      "tests_passed": 32,
+      "modules_extracted": 26
+    },
+    "guidance": {
+      "groups_passed": 13,
+      "commands": 48,
+      "focused_followup_groups": 1,
+      "focused_followup_commands": 11,
+      "doctests_passed": 5,
+      "doctests_no_run": 1
+    },
+    "toolchains": {
+      "main": "rustc 1.99.0 (b940084d7 2026-09-28)",
+      "host": "x86_64-pc-windows-msvc",
+      "edition": "2024",
+      "simd": "rustc 1.97.0-nightly (e96c36b6f 2026-05-21), nightly-2026-05-22",
+      "msrv_fixture": "1.85.0"
+    },
+    "legacy_full_check": {
+      "status": "blocked-before-compilation",
+      "attempted_toolchain": "stable 1.99.0",
+      "cargo_exit_code": 101,
+      "reason": "offline cache missing locked anyhow 1.0.102; original 1.95.0 toolchain not installed",
+      "baseline_changed": false
+    },
+    "limitations": [
+      "No full 1.95/1.96, Linux or 32-bit matrix",
+      "No Miri run or universal performance benchmarks",
+      "Mockall executed on cached 0.15.0",
+      "Insta guidance verified against primary sources, not executed",
+      "Fixtures supply documented domain stubs; not integration with real external services"
+    ]
+  },
+  "findings": [
+    {
+      "id": "F01",
+      "title": "Bezpieczne funkcje dopuszczają niezdefiniowane zachowanie przez surowe wskaźniki",
+      "severity": "wysoka",
+      "status": "corrected",
+      "files": [
+        "rules/lint-unsafe-doc.md",
+        "rules/unsafe-extern-block.md",
+        "rules/unsafe-minimize-scope.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F01",
+          "status": "completed",
+          "files": [
+            "rules/unsafe-extern-block.md",
+            "rules/unsafe-minimize-scope.md"
+          ],
+          "solution": "Bezpieczne wrappery przyjmują wycinki; kopiowanie sprawdza długości i puste wejścia, a deklaracja memcpy używa c_void. Pozostałe interfejsy surowe mają jawny kontrakt unsafe.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        },
+        {
+          "owner": "guidance",
+          "id": "F01",
+          "status": "completed",
+          "files": [
+            "rules/lint-unsafe-doc.md"
+          ],
+          "resolution": "Raw read_data is now unsafe with an explicit output lifetime and complete from_raw_parts safety obligations. Both Good and Bad avoid presenting caller-dependent raw memory access as a safe API.",
+          "checks": [
+            {
+              "group": "wrappers",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": [
+            "This assignment fixes only lint-unsafe-doc.md; other raw-wrapper locations belong to the other worker. No UB was executed."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F02",
+      "title": "Przepełnienie rozmiaru macierzy unieważnia uzasadnienie dla get_unchecked",
+      "severity": "wysoka",
+      "status": "corrected",
+      "files": [
+        "rules/opt-bounds-check.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F02",
+          "status": "completed",
+          "files": [
+            "rules/opt-bounds-check.md"
+          ],
+          "solution": "Rozmiar macierzy jest obliczany przez checked_mul przed weryfikacją długości i użyciem get_unchecked.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F03",
+      "title": "Iloczyn skalarny SIMD łączy elementy o różnych indeksach i pomija dane",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/opt-simd-portable.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F03",
+          "status": "completed",
+          "files": [
+            "rules/opt-simd-portable.md"
+          ],
+          "solution": "Oba wejścia SIMD używają tych samych indeksów chunks_exact; uzupełniono SimdFloat i obsługę ogona. Regresja porównuje 2560 kombinacji przesunięć i długości ze skalarnym wynikiem na zróżnicowanych danych.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F04",
+      "title": "Przykład kontroli kolejności destruktorów zwalnia blokadę przed zatwierdzeniem transakcji",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/mem-drop-order.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F04",
+          "status": "completed",
+          "files": [
+            "rules/mem-drop-order.md"
+          ],
+          "solution": "Transakcja powstaje i kończy się pod blokadą; kolejność destruktorów pozostaje poprawna także podczas unwinding.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F05",
+      "title": "Reset współdzielonej areny powoduje panic z powodu aktywnego pożyczenia",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/mem-arena-allocator.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F05",
+          "status": "completed",
+          "files": [
+            "rules/mem-arena-allocator.md"
+          ],
+          "solution": "Helper z HRTB nie pozwala wynikom pożyczać areny; lokalny strażnik resetuje arenę po callbacku i podczas unwinding. Zdefiniowano brak reentrancy.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F06",
+      "title": "Obietnica zwolnienia całej pamięci żądania przez Bump pomija destruktory",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/mem-arena-allocator.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F06",
+          "status": "completed",
+          "files": [
+            "rules/mem-arena-allocator.md"
+          ],
+          "solution": "Ograniczono gwarancję do pamięci areny; opisano brak Drop dla Bump::alloc i pokazano właścicielski BumpBox oraz wymagane features.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F07",
+      "title": "Pętle async nie obsługują stanów końcowych kanału lub wejścia",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/async-cancel-safety.md",
+        "rules/async-mpsc-queue.md",
+        "rules/async-select-racing.md",
+        "rules/async-watch-latest.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F07",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/async-cancel-safety.md",
+              "sha256": "1d757945842897e9b469c32234ebcd27c116e893d4bcefcc3b86e075e2d862e8"
+            },
+            {
+              "path": "rules/async-mpsc-queue.md",
+              "sha256": "fd48c89c0a176626d5552c0c4ef37c8b151ad5426732da58516c32f254bf1ae3"
+            },
+            {
+              "path": "rules/async-select-racing.md",
+              "sha256": "40ed387bd64f4876e02af9616772da2482167323f636d2cc00729cc5c89300f7"
+            },
+            {
+              "path": "rules/async-watch-latest.md",
+              "sha256": "8d45f5e716950164ab3c205e3634dba7552080b6e715263b2644ee1565669d39"
+            }
+          ],
+          "solution": "Jawna obsługa EOF/partial frame i zamkniętych kanałów; wyłączenie zamkniętego wejścia poleceń, zakończenie watch/command worker oraz close+drain przy shutdown.",
+          "validation": [
+            "reads",
+            "queue",
+            "event_loop",
+            "watch"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F08",
+      "title": "Wyjście z funkcji nie anuluje automatycznie tokenów potomnych",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/async-cancellation-token.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F08",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/async-cancellation-token.md",
+              "sha256": "e63dd53186fd63f97276b985cbb12fe719cc6f0f23995e508ce51bbf988cec96"
+            }
+          ],
+          "solution": "Serwer ma własny token potomny, drop guard sygnalizujący awaryjne wyjście, JoinSet, jawne cancel i join przy każdym kontrolowanym wyjściu. Przykład grace timeout obsługuje błędy i po abort obserwuje wszystkie joins.",
+          "validation": [
+            "hierarchy (compile)",
+            "shutdown"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F09",
+      "title": "Tabela cancellation safety myli zachowanie zasobu z zachowaniem postępu operacji",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/async-cancel-safety.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F09",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/async-cancel-safety.md",
+              "sha256": "1d757945842897e9b469c32234ebcd27c116e893d4bcefcc3b86e075e2d862e8"
+            }
+          ],
+          "solution": "Tabela odróżnia zachowanie zasobu od pozycji w kolejce. Przykład zachowuje JoinHandle poza select, oczekuje przez &mut i po przerwaniu abortuje oraz joinuje; opisano ograniczenia anulowania supervisor/blocking work.",
+          "validation": [
+            "handles"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F10",
+      "title": "Bezwzględny zakaz blokady przez await jest sprzeczny z API Tokio i dalszą treścią",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "SKILL.md",
+        "rules/anti-lock-across-await.md",
+        "rules/async-bounded-channel.md",
+        "rules/async-clone-before-await.md",
+        "rules/async-no-lock-await.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F10",
+          "status": "completed",
+          "files": [
+            "SKILL.md"
+          ],
+          "solution": "Indeks jest generowany z poprawionych warunkowych zaleceń o blokadach; usunięto bezwzględne stosowanie streszczeń bez kontekstu.",
+          "verification": "source/diff review; no new benchmark or Miri run",
+          "evidence": "original primary-source audit; corrected diff"
+        },
+        {
+          "owner": "runtime",
+          "id": "F10",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/anti-lock-across-await.md",
+              "sha256": "4f3cad395d24a65b7ac0a85a9ebf312636f2aac820ed75f65ad693ddd73f981e"
+            },
+            {
+              "path": "rules/async-bounded-channel.md",
+              "sha256": "ef429e476be91e02ecea6efe5ae7d7d87327f9671ae2b6b6960490ffa582b620"
+            },
+            {
+              "path": "rules/async-clone-before-await.md",
+              "sha256": "84694be2cde3b5a3b76826a36851f51425dd378f0282c32389762a5d038ea4cb"
+            },
+            {
+              "path": "rules/async-no-lock-await.md",
+              "sha256": "f54eeaad561cbda7a28c3c2e1901e402ae881780802da938cd8c2c3ad4333a38"
+            }
+          ],
+          "solution": "Reguły nie zakazują strażników Tokio przez await. Rozdzielono synchronizację std, serializację I/O oraz dopuszczalną semantykę snapshot/interleaving. Worker pool ma poprawny Result, zbiera outputs, zwalnia zapasowy Receiver owner i oczekuje na wszystkie zadania przed propagacją błędu.",
+          "validation": [
+            "worker_pool",
+            "arc_borrow",
+            "hierarchy (compile)"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F11",
+      "title": "trait-variant nie tworzy opisanego wariantu dyn przez boxing",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/async-fn-in-trait.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F11",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/async-fn-in-trait.md",
+              "sha256": "66bb7df3d05486cb18cb52d9258c06bddd56aa8b0e3c5cf0c7735877dd3c138d"
+            }
+          ],
+          "solution": "Usunięto obietnicę dyn z trait-variant. Dodano działający interfejs Pin<Box<dyn Future + Send + '_>>, a trait-variant pokazano jako wariant do statycznego dispatchu z Send.",
+          "validation": [
+            "dyn_repo",
+            "send_repo"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F12",
+      "title": "AsyncFn + Send nie oznacza, że future zwrócone przez wywołanie jest Send",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/async-async-fn-bounds.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F12",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/async-async-fn-bounds.md",
+              "sha256": "5b849e7c3aad424388cd9bd036f94c865805d3ffadb152d7150f01b12a3345da"
+            }
+          ],
+          "solution": "Rozdzielono Send obiektu AsyncFn od przyszłości wywołania. Dodano helper FnOnce()->Fut z Fut:Future+Send i opisano ograniczenie nielendujące; zachowano AsyncFn dla pożyczających callbacków.",
+          "validation": [
+            "async_fn",
+            "send_future"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F13",
+      "title": "timeout otrzymuje wynik try_join!, a nie future",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/async-try-join.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F13",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/async-try-join.md",
+              "sha256": "59642f375abf7db6c8bfb6079fadcb8093dbd60e4cdbc6e2b63354760875944d"
+            }
+          ],
+          "solution": "Timeout obejmuje async blok zawierający try_join; per-operation timeout również jawnie oczekuje i rozróżnia Err operacji od Elapsed.",
+          "validation": [
+            "timeouts"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F14",
+      "title": "Deklarowany MSRV 1.80 jest niezgodny z edition 2024",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/proj-msrv-declare.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F14",
+          "status": "completed",
+          "files": [
+            "rules/proj-msrv-declare.md"
+          ],
+          "resolution": "Edition2024 example and CI agree on Rust1.85. Resolver fallback is described as a preference rather than a compatibility guarantee; MSRV release policy is contextual.",
+          "checks": [
+            {
+              "group": "project-build",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": [
+            "Corrected manifest was checked on installed Rust1.85.0; a complete dependency MSRV matrix is outside this fixture."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F15",
+      "title": "Cargo nie pozwala ustawiać lto w profilu pojedynczego pakietu",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/perf-release-profile.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F15",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/perf-release-profile.md",
+              "sha256": "5b8aa1172248f222e02d9c649374b814ee78bf29e758e63d4bb04d982e2c94b9"
+            }
+          ],
+          "solution": "Usunięto niedozwolone lto z package override; konfiguracja LTO pozostała na poziomie głównego profilu. Urealniono opis false/off i tabelę trade-offs bez bezwarunkowych rankingów.",
+          "validation": [
+            "profile-metadata"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F16",
+      "title": "Poprawne przykłady FFI nadal zawierają extern niedopuszczalne w edition 2024",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/type-repr-transparent.md",
+        "rules/unsafe-extern-block.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F16",
+          "status": "completed",
+          "files": [
+            "rules/unsafe-extern-block.md"
+          ],
+          "solution": "Zachowano unsafe extern jako wymóg edition 2024 i uzgodniono deklarację memcpy z rzeczywistymi typami C; drugą lokalizację poprawiono w puli API.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        },
+        {
+          "owner": "api",
+          "id": "F16",
+          "status": "completed",
+          "changed_files": [
+            "rules/type-repr-transparent.md"
+          ],
+          "inspected_files": [
+            "rules/type-repr-transparent.md"
+          ],
+          "solution": "unsafe extern w deklaracjach edition2024; funkcje zewnętrzne pozostają unsafe, a komentarz rozdziela ABI od bezpieczeństwa wywołania.",
+          "checks": [
+            {
+              "name": "ffi-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/ffi-build.log"
+            }
+          ],
+          "limitations": [
+            "Tylko kompilacja metadanych: nie linkowano i nie wykonywano obcego ABI ani systemowych wywołań."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F17",
+      "title": "Nazwa lifetime 'de uniemożliwia pokazany derive Deserialize",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/name-lifetime-short.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F17",
+          "status": "completed",
+          "files": [
+            "rules/name-lifetime-short.md"
+          ],
+          "resolution": "Derived Request uses lifetime 'a; text distinguishes it from the 'de parameter introduced by Deserialize derive.",
+          "checks": [
+            {
+              "group": "dependency-examples",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F18",
+      "title": "Przykład przygotowany dla Loom nie kompiluje się po wybraniu typów Loom",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/test-loom-concurrency.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F18",
+          "status": "completed",
+          "files": [
+            "rules/test-loom-concurrency.md"
+          ],
+          "resolution": "Complete Loom fixture includes a manifest, declared cfg, library module, conditional std/loom constructors and correct external integration-test import.",
+          "checks": [
+            {
+              "group": "loom-configurations",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F19",
+      "title": "Miri i Loom otrzymują zbyt szerokie gwarancje wykrywania błędów",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/conc-atomic-ordering.md",
+        "rules/test-loom-concurrency.md",
+        "rules/unsafe-miri-ci.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F19",
+          "status": "completed",
+          "files": [
+            "rules/conc-atomic-ordering.md",
+            "rules/unsafe-miri-ci.md"
+          ],
+          "solution": "Miri i Loom opisano jako ograniczone narzędzia badania konkretnych wykonań/modeli. Usunięto obietnicę dowodu soundness i kompletnych przeplotów.",
+          "verification": "source/diff review; no new benchmark or Miri run",
+          "evidence": "original primary-source audit; corrected diff"
+        },
+        {
+          "owner": "guidance",
+          "id": "F19",
+          "status": "completed",
+          "files": [
+            "rules/test-loom-concurrency.md"
+          ],
+          "resolution": "Loom coverage is explicitly limited to instrumented operations and configured bounds. Claims of exhaustive C11 coverage/proof are removed; post-join model limitations are explained.",
+          "checks": [
+            {
+              "group": "loom-configurations",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": [
+            "This assignment fixes only test-loom-concurrency.md; Miri-related locations belong to the other worker."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F20",
+      "title": "clamp z NaN w granicy powoduje panic, a nie nieokreślony wynik",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/num-saturating-clamp.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F20",
+          "status": "completed",
+          "files": [
+            "rules/num-saturating-clamp.md"
+          ],
+          "solution": "Opis clamp uwzględnia panic dla niepoprawnych granic w obu profilach oraz rozróżnia NaN argumentu i granic.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F21",
+      "title": "pub(super) w module parser udostępnia elementy także modułowi codegen",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/proj-pub-crate-internal.md",
+        "rules/proj-pub-super-parent.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F21",
+          "status": "completed",
+          "files": [
+            "rules/proj-pub-crate-internal.md",
+            "rules/proj-pub-super-parent.md"
+          ],
+          "resolution": "Visibility prose/tables include descendants. Reworked parser example defines pub(super) items in parser::shared, keeps private modules inaccessible to codegen, and exposes a public facade with public result types.",
+          "checks": [
+            {
+              "group": "test-discovery-and-privacy",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            },
+            {
+              "group": "test-discovery-and-privacy",
+              "status": "pass",
+              "results": "local-verification/guidance-validation-final-privacy/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F22",
+      "title": "Newtype zawierający String nie może implementować Copy",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/api-newtype-safety.md",
+        "rules/type-newtype-validated.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F22",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-newtype-safety.md"
+          ],
+          "inspected_files": [
+            "rules/api-newtype-safety.md",
+            "rules/type-newtype-validated.md"
+          ],
+          "solution": "Usunięto Copy z Email(String) w api-newtype-safety. type-newtype-validated sprawdzony: już zawierał właściwy Clone bez Copy i nie wymagał zmiany.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F23",
+      "title": "Zastąpienie zwracanego Self przez Box<Self> nie przywraca dyn compatibility",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/trait-object-safety.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F23",
+          "status": "completed",
+          "changed_files": [
+            "rules/trait-object-safety.md"
+          ],
+          "inspected_files": [
+            "rules/trait-object-safety.md"
+          ],
+          "solution": "Tabela wyraźnie odrzuca wynik Box<Self>; wskazuje Box<dyn Trait> lub Self:Sized i odróżnia legalny receiver self:Box<Self>.",
+          "checks": [
+            {
+              "name": "dyn-box-self-reject-build",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/dyn-box-self-reject-build.log"
+            },
+            {
+              "name": "dyn-box-trait-pass-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/dyn-box-trait-pass-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F24",
+      "title": "Przykład oszczędzania paddingu zakłada kolejność pól niegwarantowaną przez repr(Rust)",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/mem-smaller-integers.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F24",
+          "status": "completed",
+          "files": [
+            "rules/mem-smaller-integers.md"
+          ],
+          "solution": "Porównanie ułożenia pól używa repr(C); rozmiary są właściwe dla wskazanego celu 64-bit i sprawdzane asercjami.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F25",
+      "title": "Opis floatów myli równość liczbową z bitową i pozycję wszystkich NaN",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/num-float-compare.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F25",
+          "status": "completed",
+          "files": [
+            "rules/num-float-compare.md"
+          ],
+          "solution": "Rozdzielono porównanie przybliżone, porządek total_cmp i porównanie bitowe; testy jawnie konstruują znak NaN i oba zera.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F26",
+      "title": "Przykład Serde z literówką już odrzuca wejście bez deny_unknown_fields",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/serde-default-compat.md",
+        "rules/serde-deny-unknown-fields.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F26",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/serde-default-compat.md",
+              "sha256": "55783303cc5baf971049f91abe071c01c2c004bfedfa942dfd213d2819deadd4"
+            },
+            {
+              "path": "rules/serde-deny-unknown-fields.md",
+              "sha256": "285a35ff761e585afd771f3d9c058fe71a975882950e1895392bc6369441bbd7"
+            }
+          ],
+          "solution": "Dodano jawny default timeout w porównaniu strict/permissive; wstęp odróżnia brak pola od nieznanego pola. Default-compat wyjaśnia zwykłe Option, generyczne default functions i kierunek kompatybilności.",
+          "validation": [
+            "permissive",
+            "strict",
+            "defaults"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F27",
+      "title": "unsafe_op_in_unsafe_fn jest domyślnie ostrzeżeniem, nie twardym błędem edition 2024",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/unsafe-minimize-scope.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F27",
+          "status": "completed",
+          "files": [
+            "rules/unsafe-minimize-scope.md"
+          ],
+          "solution": "Rozdzielono kontrakt unsafe fn od zakresu unsafe block; domyślny lint edition 2024 opisano jako ostrzeżenie z opcją deny.",
+          "verification": "source/diff review; no new benchmark or Miri run",
+          "evidence": "original primary-source audit; corrected diff"
+        }
+      ]
+    },
+    {
+      "id": "F28",
+      "title": "Cell nie jest analogiczne do Rc pod względem Send",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/unsafe-send-sync-manual.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F28",
+          "status": "completed",
+          "files": [
+            "rules/unsafe-send-sync-manual.md"
+          ],
+          "solution": "Poprawiono charakterystykę Send/Sync dla Cell, Rc i PhantomData; wymagania własności muszą być wymuszane przez abstrakcję.",
+          "verification": "source/diff review; no new benchmark or Miri run",
+          "evidence": "original primary-source audit; corrected diff"
+        }
+      ]
+    },
+    {
+      "id": "F29",
+      "title": "Optymalizacja Result z NonZero wymaga warunków dotyczących drugiego wariantu",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/num-nonzero.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F29",
+          "status": "completed",
+          "files": [
+            "rules/num-nonzero.md"
+          ],
+          "solution": "Newtype NonZero ma repr(transparent); gwarancję niche dla Result ograniczono do udokumentowanych warunków.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F30",
+      "title": "Opis wartości lto = false i lto = \"off\" jest odwrócony",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/opt-lto-release.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F30",
+          "status": "completed",
+          "files": [
+            "rules/opt-lto-release.md"
+          ],
+          "solution": "Rozdzielono false od off dla LTO; usunięto uniwersalne przyrosty wydajności, a wybór profilu uzależniono od pomiarów i semantyki panic.",
+          "verification": "source/diff review; no new benchmark or Miri run",
+          "evidence": "original primary-source audit; corrected diff"
+        }
+      ]
+    },
+    {
+      "id": "F31",
+      "title": "Reset bumpalo nie ma bezwarunkowo stałego kosztu",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/mem-arena-allocator.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F31",
+          "status": "completed",
+          "files": [
+            "rules/mem-arena-allocator.md"
+          ],
+          "solution": "Usunięto obietnicę resetu areny w O(1) oraz nieuzasadniony mnożnik przyspieszenia; opis uwzględnia zwalnianie dodatkowych chunków.",
+          "verification": "source/diff review; no new benchmark or Miri run",
+          "evidence": "original primary-source audit; corrected diff"
+        }
+      ]
+    },
+    {
+      "id": "F32",
+      "title": "Bezpieczny get_unchecked traci jedyne sprawdzenie granic w release",
+      "severity": "wysoka",
+      "status": "corrected",
+      "files": [
+        "rules/lint-unsafe-doc.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F32",
+          "status": "completed",
+          "files": [
+            "rules/lint-unsafe-doc.md"
+          ],
+          "resolution": "Safe Buffer::get checks the actual Vec length with an unconditional assertion in every profile; debug_assert-only soundness reasoning is removed.",
+          "checks": [
+            {
+              "group": "wrappers",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F33",
+      "title": "Obcinanie tekstu może panikować na poprawnym UTF-8",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/api-extension-trait.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F33",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-extension-trait.md"
+          ],
+          "inspected_files": [
+            "rules/api-extension-trait.md"
+          ],
+          "solution": "Limit jawnie liczony w bajtach; cięcie cofa się do granicy UTF-8, a limity0–2 zwracają odpowiednią liczbę kropek.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F34",
+      "title": "Zamiana makra double na funkcję zmienia wynik z 42 na 441",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/macro-prefer-functions.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F34",
+          "status": "completed",
+          "changed_files": [
+            "rules/macro-prefer-functions.md"
+          ],
+          "inspected_files": [
+            "rules/macro-prefer-functions.md"
+          ],
+          "solution": "double oblicza x+x z bound Add, zachowując wynik42 dla21.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F35",
+      "title": "parse_macro_input! nie działa w pomocniku zwracającym Result",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/macro-proc-error-spans.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F35",
+          "status": "completed",
+          "changed_files": [
+            "rules/macro-proc-error-spans.md"
+          ],
+          "inspected_files": [
+            "rules/macro-proc-error-spans.md"
+          ],
+          "solution": "Pomocnik parsuje syn::parse(input)? i zwraca TokenStream2; konwersja diagnostyki w entry point. Zachowane generyki i zgodne objaśnienie.",
+          "checks": [
+            {
+              "name": "proc-consumer",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/proc-consumer.log"
+            },
+            {
+              "name": "proc-reject-tuple",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/proc-reject-tuple.log"
+            },
+            {
+              "name": "proc-reject-empty",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/proc-reject-empty.log"
+            },
+            {
+              "name": "proc-reject-enum",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/proc-reject-enum.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F36",
+      "title": "Wzorzec Partially Sealed nie pozwala użytkownikowi nadpisać name",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/api-sealed-trait.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F36",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-sealed-trait.md"
+          ],
+          "inspected_files": [
+            "rules/api-sealed-trait.md"
+          ],
+          "solution": "Otwarty PluginName konfiguruje ManagedPlugin<N>; wyłącznie wrapper implementuje zamknięty Plugin i zachowuje kontrolę lifecycle.",
+          "checks": [
+            {
+              "name": "sealed_api-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/sealed_api-build.log"
+            },
+            {
+              "name": "sealed-consumer-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/sealed-consumer-build.log"
+            },
+            {
+              "name": "sealed-consumer-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/sealed-consumer-run.log"
+            },
+            {
+              "name": "sealed-reject-build",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/sealed-reject-build.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F37",
+      "title": "Konfiguracja unused_must_use w sekcji clippy nie wymusza błędu",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/api-must-use.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F37",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-must-use.md"
+          ],
+          "inspected_files": [
+            "rules/api-must-use.md"
+          ],
+          "solution": "unused_must_use przeniesiony do lints.rust; linty Clippy pozostają w lints.clippy.",
+          "checks": [
+            {
+              "name": "cargo-lint-result",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/cargo-lint-result.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F38",
+      "title": "Usunięcie const z publicznego const fn łamie używający go kod",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/const-fn.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F38",
+          "status": "completed",
+          "changed_files": [
+            "rules/const-fn.md"
+          ],
+          "inspected_files": [
+            "rules/const-fn.md"
+          ],
+          "solution": "Publiczne const-callability opisane jako zobowiązanie API; usunięcie const wymaga breaking release. Dopasowano rozmiar Bad make_buf do długości nagłówka.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": [
+            "Zmiana opisu zweryfikowana względem źródeł pierwotnych z końcowego audytu; kompilacja bieżąca nie dowodzi historycznej daty stabilizacji, złożoności ani wydajności."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F39",
+      "title": "Dzielenie chronione tylko przed zerem nadal panikuje dla MIN / -1",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/doc-panics-section.md",
+        "rules/err-result-over-panic.md",
+        "rules/type-result-fallible.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F39",
+          "status": "completed",
+          "changed_files": [
+            "rules/type-result-fallible.md"
+          ],
+          "inspected_files": [
+            "rules/type-result-fallible.md"
+          ],
+          "solution": "checked_div po odrębnym sprawdzeniu zera zwraca Overflow dla MIN/-1; dodano enum błędów i zgodne formatowanie.",
+          "checks": [
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            },
+            {
+              "name": "division-release-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/division-release-build.log"
+            },
+            {
+              "name": "division-release-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/division-release-run.log"
+            }
+          ],
+          "limitations": []
+        },
+        {
+          "owner": "runtime",
+          "id": "F39",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/err-result-over-panic.md",
+              "sha256": "6a8ed7905f183f95d2c7be5e0738771fb909c93f6b28ffb0d0bbce8515e91a75"
+            }
+          ],
+          "solution": "divide po kontroli zera używa checked_div i zwraca błąd przepełnienia MIN/-1.",
+          "validation": [
+            "divide"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        },
+        {
+          "owner": "guidance",
+          "id": "F39",
+          "status": "completed",
+          "files": [
+            "rules/doc-panics-section.md"
+          ],
+          "resolution": "checked_divide delegates to checked_div; Panics and the arithmetic table cover MIN/-1 even with overflow checks disabled.",
+          "checks": [
+            {
+              "group": "division-and-doctest",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F40",
+      "title": "Konwersja identyfikatora do i64 zmienia duże dodatnie ID w ujemne",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/type-newtype-ids.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F40",
+          "status": "completed",
+          "changed_files": [
+            "rules/type-newtype-ids.md"
+          ],
+          "inspected_files": [
+            "rules/type-newtype-ids.md"
+          ],
+          "solution": "Zastąpiono stratne as_i64 przez try_to_i64 zwracające Result<TryFromIntError>; zakresID nie zostaje zawężony bez wiedzy callera.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F41",
+      "title": "Dziedziczenia lintów workspace nie można łączyć z lokalnym nadpisaniem w Cargo.toml",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/lint-workspace-lints.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F41",
+          "status": "completed",
+          "files": [
+            "rules/lint-workspace-lints.md"
+          ],
+          "resolution": "Member manifests retain workspace inheritance; per-crate exceptions are documented as source attributes rather than forbidden local lints tables.",
+          "checks": [
+            {
+              "group": "workspace-inheritance",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F42",
+      "title": "should_panic nie obsługuje testu zwracającego Result",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/test-should-panic.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F42",
+          "status": "completed",
+          "files": [
+            "rules/test-should-panic.md"
+          ],
+          "resolution": "should_panic test returns unit, handles setup explicitly and matches a specific expected panic message.",
+          "checks": [
+            {
+              "group": "should-panic",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F43",
+      "title": "Wejście tests/api/mod.rs nie jest automatycznie uruchamianym testem integracyjnym",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/test-integration-dir.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F43",
+          "status": "completed",
+          "files": [
+            "rules/test-integration-dir.md"
+          ],
+          "resolution": "Nested integration test entry point is tests/api/main.rs; discovery and helper-module alternatives are explained.",
+          "checks": [
+            {
+              "group": "test-discovery-and-privacy",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            },
+            {
+              "group": "test-discovery-and-privacy",
+              "status": "pass",
+              "results": "local-verification/guidance-validation-final-privacy/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F44",
+      "title": "INSTA_UPDATE=unseen akceptuje nowe snapshoty zamiast je odrzucać w CI",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/test-snapshot-testing.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F44",
+          "status": "completed",
+          "files": [
+            "rules/test-snapshot-testing.md"
+          ],
+          "resolution": "CI uses INSTA_UPDATE=no; unseen is explicitly described as auto-accepting new snapshots, and first-run snapshots are candidates pending review.",
+          "checks": [
+            {
+              "group": "primary-source semantic check",
+              "status": "pass",
+              "source": "https://insta.rs/docs/advanced/#controlling-snapshot-updating",
+              "result": "INSTA_UPDATE=no rejects unapproved snapshots; unseen accepts previously unseen snapshots."
+            }
+          ],
+          "limitations": [
+            "Insta is not cached; no runtime snapshot fixture was executed."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F45",
+      "title": "Łańcuch returning ustawia ostatnią odpowiedź zamiast sekwencji 1,2,3",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/test-mockall-mocking.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F45",
+          "status": "completed",
+          "files": [
+            "rules/test-mockall-mocking.md"
+          ],
+          "resolution": "One stateful FnMut closure yields the three requested values. Text explains why repeated returning calls replace an expectation.",
+          "checks": [
+            {
+              "group": "dependency-examples",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": [
+            "Executed against cached Mockall0.15.0; documented0.12 and baseline lock0.13.1 unavailable offline. API behavior is unchanged for this returning closure pattern, but those versions were not executed."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F46",
+      "title": "Clippy nie przyjmuje warn=[...] w clippy.toml",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/lint-warn-suspicious.md",
+        "rules/proj-mod-rs-dir.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F46",
+          "status": "completed",
+          "files": [
+            "rules/lint-warn-suspicious.md",
+            "rules/proj-mod-rs-dir.md"
+          ],
+          "resolution": "Clippy lint levels use manifest/source/CLI, not clippy.toml. The module-layout lint block is valid TOML with Cargo comments.",
+          "checks": [
+            {
+              "group": "lint-manifests",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F47",
+      "title": "Grupa pedantic i jej wyjątki bez priority powodują błąd Clippy",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/lint-cargo-metadata.md",
+        "rules/lint-pedantic-selective.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F47",
+          "status": "completed",
+          "files": [
+            "rules/lint-cargo-metadata.md",
+            "rules/lint-pedantic-selective.md"
+          ],
+          "resolution": "Pedantic and cargo groups have priority -1 below individual lint exceptions; TOML ordering limitations are explained.",
+          "checks": [
+            {
+              "group": "lint-manifests",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F48",
+      "title": "Klonowanie Arc/Rc przed await nie zapewnia Send, a pożyczony slice nie odbiera go automatycznie",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/async-clone-before-await.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F48",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/async-clone-before-await.md",
+              "sha256": "84694be2cde3b5a3b76826a36851f51425dd378f0282c32389762a5d038ea4cb"
+            }
+          ],
+          "solution": "Zastąpiono fałszywy przykład !Send przez przykład Rc i działające pożyczenie slice z posiadanego Arc przez await. Clone jest dodatkową własnością, nie automatyczną poprawką Send.",
+          "validation": [
+            "arc_borrow",
+            "async_fn"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F49",
+      "title": "Runtime przeznaczony dla I/O nie włącza sterowników I/O ani czasu",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/async-tokio-runtime.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F49",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/async-tokio-runtime.md",
+              "sha256": "17bf377d403c9dd5e833fb42b229147eed819a4d443a7ef0b21ce444f8044e9f"
+            }
+          ],
+          "solution": "Runtime I/O włącza enable_all. Metody spawn zwracają JoinHandle, opis wymaga ich zachowania/join i rozróżnia limity workerów async od blocking pool.",
+          "validation": [
+            "drivers"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F50",
+      "title": "Zerowy chunk_size uniemożliwia zakończenie process_in_chunks",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/perf-drain-reuse.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F50",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/perf-drain-reuse.md",
+              "sha256": "7a2180ef0c8c2f1237bca130bf046ac94ad2240b52697d19e5356946aed952f1"
+            }
+          ],
+          "solution": "process_in_chunks przyjmuje NonZeroUsize i używa get(), więc zerowy postęp nie jest reprezentowalny w wejściu.",
+          "validation": [
+            "chunking"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F51",
+      "title": "Debug błędu nie gwarantuje pełnego łańcucha source",
+      "severity": "średnia",
+      "status": "corrected",
+      "files": [
+        "rules/obs-error-chain.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F51",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/obs-error-chain.md",
+              "sha256": "1e1c89868abdd105622fd2379f61e74d96fd35aa8cb123be6998ded14d2a2c83"
+            }
+          ],
+          "solution": "Opis Debug nie obiecuje source-chain; zaleca jawne przejście po source lub reporter. Działający przykład anyhow alternate Display pozostawiono.",
+          "validation": [
+            "prose_contracts::logging_kv_and_error_sources_are_distinct_from_debug"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F52",
+      "title": "Ponowny eksport makra w tym samym korzeniu powoduje E0255",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/macro-export-crate-path.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F52",
+          "status": "completed",
+          "changed_files": [
+            "rules/macro-export-crate-path.md"
+          ],
+          "inspected_files": [
+            "rules/macro-export-crate-path.md"
+          ],
+          "solution": "Usunięto duplikujący pub use greet z korzenia; dodano realny publiczny helper wywoływany przez eksportowane makro.",
+          "checks": [
+            {
+              "name": "macro_api-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/macro_api-build.log"
+            },
+            {
+              "name": "macro-consumer-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/macro-consumer-build.log"
+            },
+            {
+              "name": "macro-consumer-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/macro-consumer-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F53",
+      "title": "Domyślna liczba ponowień wynosi zero zamiast opisanych trzech",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/api-builder-pattern.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F53",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-builder-pattern.md"
+          ],
+          "inspected_files": [
+            "rules/api-builder-pattern.md"
+          ],
+          "solution": "Ręczny Default ustawia max_retries=3; test sprawdza new/default, nadpisanie0, timeout30 i brak wymaganegoURL.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F54",
+      "title": "Opis must_use myli atrybut typu Result z metodami Option",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/api-builder-must-use.md",
+        "rules/api-must-use.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F54",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-builder-must-use.md",
+            "rules/api-must-use.md"
+          ],
+          "inspected_files": [
+            "rules/api-builder-must-use.md",
+            "rules/api-must-use.md"
+          ],
+          "solution": "Rozdzielono must_use typu Result od atrybutów metod; Option::map nie jest przedstawiane jako ostrzegające. Doprecyzowano jawne odrzucanie błędów.",
+          "checks": [
+            {
+              "name": "must-use-option-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/must-use-option-build.log"
+            },
+            {
+              "name": "must-use-first-build",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/must-use-first-build.log"
+            },
+            {
+              "name": "cargo-lint-result",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/cargo-lint-result.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F55",
+      "title": "Ignorowanie konsumującego buildera nie pozwala wysłać starej konfiguracji",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/api-builder-must-use.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F55",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-builder-must-use.md"
+          ],
+          "inspected_files": [
+            "rules/api-builder-must-use.md"
+          ],
+          "solution": "Bad pokazuje realne ciche odrzucenie jednej konsumującej metody; opis zaznacza E0382 przy ponownym użyciu i odróżnia setter &mut self.",
+          "checks": [
+            {
+              "name": "must-use-builder-build",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/must-use-builder-build.log"
+            },
+            {
+              "name": "builder-moved-reject-build",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/builder-moved-reject-build.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F56",
+      "title": "move nie wyłącza precyzyjnego przechwytywania pól w edition 2021+",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/closure-disjoint-capture.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F56",
+          "status": "completed",
+          "changed_files": [
+            "rules/closure-disjoint-capture.md"
+          ],
+          "inspected_files": [
+            "rules/closure-disjoint-capture.md"
+          ],
+          "solution": "move korzysta z precyzyjnego capture; dobry przykład bez lokalnego obejścia, zły przechwytuje całe &config. Uzgodniono wstęp i Key Points.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F57",
+      "title": "Pokazane nieprzechwytujące closures nie wymagają Box<dyn Fn>",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/closure-impl-fn-return.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F57",
+          "status": "completed",
+          "changed_files": [
+            "rules/closure-impl-fn-return.md"
+          ],
+          "inspected_files": [
+            "rules/closure-impl-fn-return.md"
+          ],
+          "solution": "Nieprzechwytujące gałęzie zwracają fn pointer; dodano pojedynczą capturing closure impl Fn. Boxing opisany jako możliwość dla heterogenicznych kolekcji.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F58",
+      "title": "Edition 2024 nie zakazuje deklaracji ani odczytu wartości static mut",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/const-vs-static.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F58",
+          "status": "completed",
+          "changed_files": [
+            "rules/const-vs-static.md"
+          ],
+          "inspected_files": [
+            "rules/const-vs-static.md"
+          ],
+          "solution": "Opis precyzuje domyślny lint static_mut_refs i odróżnia tworzenie referencji od deklaracji oraz unsafe odczytów/zapisów wartości.",
+          "checks": [
+            {
+              "name": "static-mut-value-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/static-mut-value-build.log"
+            },
+            {
+              "name": "static-mut-ref-reject-build",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/static-mut-ref-reject-build.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F59",
+      "title": "str i String nie koercjonują automatycznie do Path",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/own-slice-over-vec.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F59",
+          "status": "completed",
+          "changed_files": [
+            "rules/own-slice-over-vec.md"
+          ],
+          "inspected_files": [
+            "rules/own-slice-over-vec.md"
+          ],
+          "solution": "Komentarz &Path ograniczony do &Path/&PathBuf; tekst wymaga jawnego Path::new lub wariantu AsRef<Path>.",
+          "checks": [
+            {
+              "name": "path-views-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/path-views-build.log"
+            },
+            {
+              "name": "path-views-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/path-views-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F60",
+      "title": "Przykład deref coercion pożycza Vec po skonsumowaniu go",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/own-slice-over-vec.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F60",
+          "status": "completed",
+          "changed_files": [
+            "rules/own-slice-over-vec.md"
+          ],
+          "inspected_files": [
+            "rules/own-slice-over-vec.md"
+          ],
+          "solution": "Pożyczenie Vec przeniesiono przed into_boxed_slice; dodano brakujący import Arc.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F61",
+      "title": "all-features nie uruchamia wszystkich kombinacji cech",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/api-serde-optional.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F61",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-serde-optional.md"
+          ],
+          "inspected_files": [
+            "rules/api-serde-optional.md"
+          ],
+          "solution": "all-features opisane jako jedna konfiguracja; osobne zadania dla wspieranych pojedynczych cech i par.",
+          "checks": [],
+          "limitations": [
+            "Zmiana opisu zweryfikowana względem źródeł pierwotnych z końcowego audytu; kompilacja bieżąca nie dowodzi historycznej daty stabilizacji, złożoności ani wydajności."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F62",
+      "title": "Const generic defaults ustabilizowano w 1.59, nie 1.65",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/const-generics.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F62",
+          "status": "completed",
+          "changed_files": [
+            "rules/const-generics.md"
+          ],
+          "inspected_files": [
+            "rules/const-generics.md"
+          ],
+          "solution": "Datę const generic defaults poprawiono na1.59, odróżniając minimalne const generics1.51.",
+          "checks": [
+            {
+              "name": "const-defaults-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/const-defaults-build.log"
+            }
+          ],
+          "limitations": [
+            "Zmiana opisu zweryfikowana względem źródeł pierwotnych z końcowego audytu; kompilacja bieżąca nie dowodzi historycznej daty stabilizacji, złożoności ani wydajności."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F63",
+      "title": "Diverging return -> ! jest starszy niż Rust1.41",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/type-never-diverge.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F63",
+          "status": "completed",
+          "changed_files": [
+            "rules/type-never-diverge.md"
+          ],
+          "inspected_files": [
+            "rules/type-never-diverge.md"
+          ],
+          "solution": "Diverging return ->! opisany jako stabilny od1.0; zachowano rozróżnienie od niestabilnych arbitralnych argumentów typu.",
+          "checks": [
+            {
+              "name": "never-return-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/never-return-build.log"
+            }
+          ],
+          "limitations": [
+            "Zmiana opisu zweryfikowana względem źródeł pierwotnych z końcowego audytu; kompilacja bieżąca nie dowodzi historycznej daty stabilizacji, złożoności ani wydajności."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F64",
+      "title": "VecDeque nie spełnia wymagania O(1) split/splice w dowolnym miejscu",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/coll-seq-choice.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F64",
+          "status": "completed",
+          "changed_files": [
+            "rules/coll-seq-choice.md"
+          ],
+          "inspected_files": [
+            "rules/coll-seq-choice.md"
+          ],
+          "solution": "Usunięto VecDeque jako rozwiązanie O(1) dowolnego split/splice; tabela wskazuje zmianę reprezentacji i kopiowanie split_off.",
+          "checks": [],
+          "limitations": [
+            "Zmiana opisu zweryfikowana względem źródeł pierwotnych z końcowego audytu; kompilacja bieżąca nie dowodzi historycznej daty stabilizacji, złożoności ani wydajności."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F65",
+      "title": "Bezwzględne zalecenie derive Debug pomija ukrywanie sekretów",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/api-common-traits.md",
+        "rules/type-display-vs-debug.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F65",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-common-traits.md",
+            "rules/type-display-vs-debug.md"
+          ],
+          "inspected_files": [
+            "rules/api-common-traits.md",
+            "rules/type-display-vs-debug.md"
+          ],
+          "solution": "Wymóg implementacji Debug oddzielony od derive w tekście/tabelach; zachowano redakcję Password i dodano ręczne Debug dla Config.api_key.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": [
+            "Test Config usuwa wyłącznie atrybuty Serde, zachowując rzeczywiste ciało Debug; nie sprawdza serializacji."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F66",
+      "title": "Komentarz mylnie wymaga deklaracji static lub literału do uzyskania &'static str",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/const-vs-static.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F66",
+          "status": "completed",
+          "changed_files": [
+            "rules/const-vs-static.md"
+          ],
+          "inspected_files": [
+            "rules/const-vs-static.md"
+          ],
+          "solution": "Komentarz dopuszcza statyczny czas życia literałów/promowanych stałych bez deklaracji static; rozdzielono lifetime od pojedynczego adresu.",
+          "checks": [
+            {
+              "name": "promoted-str-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/promoted-str-build.log"
+            },
+            {
+              "name": "promoted-str-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/promoted-str-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F67",
+      "title": "Samo impl Into nie narzuca dodatkowego kosztu wywołania",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/api-impl-into.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F67",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-impl-into.md"
+          ],
+          "inspected_files": [
+            "rules/api-impl-into.md"
+          ],
+          "solution": "Zastąpiono twierdzenie o narzucie dispatchu opisem monomorfizacji oraz rzeczywistego kosztu konkretnej konwersji; działający przykład zwraca u64.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": [
+            "Zmiana opisu zweryfikowana względem źródeł pierwotnych z końcowego audytu; kompilacja bieżąca nie dowodzi historycznej daty stabilizacji, złożoności ani wydajności."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F68",
+      "title": "Przykład Cow deklaruje Option, lecz zwraca nieopakowane Cow",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/own-borrow-over-clone.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F68",
+          "status": "completed",
+          "changed_files": [
+            "rules/own-borrow-over-clone.md"
+          ],
+          "inspected_files": [
+            "rules/own-borrow-over-clone.md"
+          ],
+          "solution": "Samodzielna adaptacja basename wylicza granicę, opakowuje oba warianty w Some, zachowuje borrowed/owned i obsługuje pusty/końcowy separator.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F69",
+      "title": "Przykład parsowania granicznego zwraca () zamiast Result<Response, Error>",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/api-parse-dont-validate.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F69",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-parse-dont-validate.md"
+          ],
+          "inspected_files": [
+            "rules/api-parse-dont-validate.md"
+          ],
+          "solution": "handle_request zwraca Ok(Response), a process_user konstruuje zadeklarowane Response z wartości po parsowaniu; kontrakty wyniku są zgodne.",
+          "checks": [
+            {
+              "name": "extracted-examples-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-build.log"
+            },
+            {
+              "name": "extracted-examples-run",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/extracted-examples-run.log"
+            }
+          ],
+          "limitations": [
+            "Próba używa lokalnych stand-in typów i parserów domenowych; sprawdza kontrakt wyniku oraz propagację, nie pełną walidację email."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F70",
+      "title": "Samo utworzenie HashMap nie wymaga Hash ani Eq klucza",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/api-common-traits.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "api",
+          "id": "F70",
+          "status": "completed",
+          "changed_files": [
+            "rules/api-common-traits.md"
+          ],
+          "inspected_files": [
+            "rules/api-common-traits.md"
+          ],
+          "solution": "HashMap::new przedstawiono jako legalne; błąd braku Eq+Hash występuje dopiero przy insert.",
+          "checks": [
+            {
+              "name": "hashmap-construction-build",
+              "passed": true,
+              "expected": "success",
+              "log": "local-verification/api-validation/final/hashmap-construction-build.log"
+            },
+            {
+              "name": "hashmap-insert-reject-build",
+              "passed": true,
+              "expected": "rejection",
+              "log": "local-verification/api-validation/final/hashmap-insert-reject-build.log"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F71",
+      "title": "Przykłady konfiguracji stable rustfmt zawierają ignorowane opcje nightly",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/lint-rustfmt-check.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F71",
+          "status": "completed",
+          "files": [
+            "rules/lint-rustfmt-check.md"
+          ],
+          "resolution": "Stable rustfmt configuration contains only stable options. Import grouping and ignore examples are clearly nightly-only; stable skip attributes and direct file formatting are shown.",
+          "checks": [
+            {
+              "group": "stable-rustfmt",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F72",
+      "title": "EnvGuard usuwa pierwotną zmienną środowiskową o wartości non-Unicode",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/test-fixture-raii.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F72",
+          "status": "completed",
+          "files": [
+            "rules/test-fixture-raii.md"
+          ],
+          "resolution": "EnvGuard stores Option<OsString> using var_os. Environment mutation requires an unsafe constructor and exclusive process access through Drop; example runs in a dedicated helper process.",
+          "checks": [
+            {
+              "group": "environment",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F73",
+      "title": "Domyślny tokio::test korzysta z current_thread",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/test-tokio-async.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F73",
+          "status": "completed",
+          "files": [
+            "rules/test-tokio-async.md"
+          ],
+          "resolution": "tokio::test default is current_thread; multi-thread and paused-time feature requirements are stated.",
+          "checks": [
+            {
+              "group": "dependency-examples",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F74",
+      "title": "Znaczenie lintów mod_module_files i self_named_module_files jest odwrócone",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/proj-mod-rs-dir.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F74",
+          "status": "completed",
+          "files": [
+            "rules/proj-mod-rs-dir.md"
+          ],
+          "resolution": "self_named_module_files requires mod.rs; mod_module_files forbids it. The policy example enables only one.",
+          "checks": [
+            {
+              "group": "lint-manifests",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F75",
+      "title": "Autocfg pyta o niekompletny typ BTreeMap i stale zgłasza brak wsparcia",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/proj-build-rs-minimal.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F75",
+          "status": "completed",
+          "files": [
+            "rules/proj-build-rs-minimal.md"
+          ],
+          "resolution": "autocfg uses emit_path_cfg for the generic BTreeMap path and declares generated cfg names.",
+          "checks": [
+            {
+              "group": "project-build",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F76",
+      "title": "no_run nie nadaje przykładowi kontekstu async",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/doc-hidden-setup.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F76",
+          "status": "completed",
+          "files": [
+            "rules/doc-hidden-setup.md"
+          ],
+          "resolution": "no_run server example has a hidden async helper; text distinguishes compilation from execution.",
+          "checks": [
+            {
+              "group": "doctests",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F77",
+      "title": "Sam operator ? nie tworzy automatycznie wrappera doctestu zwracającego Result",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/doc-link-types.md",
+        "rules/doc-module-inner.md",
+        "rules/doc-question-mark.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F77",
+          "status": "completed",
+          "files": [
+            "rules/doc-link-types.md",
+            "rules/doc-module-inner.md",
+            "rules/doc-question-mark.md"
+          ],
+          "resolution": "Question-mark inference requires explicit Result main or typed trailing Ok. Affected doctests have hidden imports, setup and typed successful returns.",
+          "checks": [
+            {
+              "group": "doctests",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F78",
+      "title": "Przykład no_std wymaga jawnego importu crate alloc",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/proj-feature-additive.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F78",
+          "status": "completed",
+          "files": [
+            "rules/proj-feature-additive.md"
+          ],
+          "resolution": "no_std branch explicitly imports alloc; both default and no-default-feature builds work.",
+          "checks": [
+            {
+              "group": "project-build",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F79",
+      "title": "Puste vec![] nie wykonuje dodatkowej alokacji względem Vec::new",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/lint-warn-perf.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F79",
+          "status": "completed",
+          "files": [
+            "rules/lint-warn-perf.md"
+          ],
+          "resolution": "Empty vec![] and Vec::new are described as equivalent nonallocating constructors.",
+          "checks": [
+            {
+              "group": "conversions",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F80",
+      "title": "Funkcja oznaczona #[test] nie trafia do zwykłego release bez cfg(test)",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/test-cfg-test-module.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F80",
+          "status": "completed",
+          "files": [
+            "rules/test-cfg-test-module.md"
+          ],
+          "resolution": "The whole test module gate is distinguished from automatic exclusion of #[test] functions; ordinary release is verified separately.",
+          "checks": [
+            {
+              "group": "test-discovery-and-privacy",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            },
+            {
+              "group": "test-discovery-and-privacy",
+              "status": "pass",
+              "results": "local-verification/guidance-validation-final-privacy/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F81",
+      "title": "Jawny import z crate nie odbiera potomnemu modułowi dostępu do prywatnych elementów",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/test-use-super.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F81",
+          "status": "completed",
+          "files": [
+            "rules/test-use-super.md"
+          ],
+          "resolution": "Explicit crate paths and glob imports share the same privacy rules; prose no longer claims a glob grants access.",
+          "checks": [
+            {
+              "group": "test-discovery-and-privacy",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            },
+            {
+              "group": "test-discovery-and-privacy",
+              "status": "pass",
+              "results": "local-verification/guidance-validation-final-privacy/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F82",
+      "title": "Cargo automatycznie wykrywa README.md bez pola readme",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/doc-crate-readme.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F82",
+          "status": "completed",
+          "files": [
+            "rules/doc-crate-readme.md"
+          ],
+          "resolution": "README autodetection is documented, along with explicit selection and readme=false.",
+          "checks": [
+            {
+              "group": "project-build",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F83",
+      "title": "Build script bez rerun-if nie uruchamia się bezwarunkowo przy każdym buildzie",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/proj-build-rs-minimal.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F83",
+          "status": "completed",
+          "files": [
+            "rules/proj-build-rs-minimal.md"
+          ],
+          "resolution": "Build-script reruns depend on tracked changes rather than every invocation; cached behavior is described accurately.",
+          "checks": [
+            {
+              "group": "project-build",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F84",
+      "title": "Przykład standardowej biblioteki używa nieistniejącego std::io::IoError",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/name-acronym-word.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F84",
+          "status": "completed",
+          "files": [
+            "rules/name-acronym-word.md"
+          ],
+          "resolution": "Nonexistent std::io::IoError is replaced by real std::str::Utf8Error and std::io::Error examples.",
+          "checks": [
+            {
+              "group": "conversions",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F85",
+      "title": "Przykłady konwersji kolekcji mają niezgodne adnotacje typów wyniku",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/name-into-ownership.md",
+        "rules/name-to-expensive.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F85",
+          "status": "completed",
+          "files": [
+            "rules/name-into-ownership.md",
+            "rules/name-to-expensive.md"
+          ],
+          "resolution": "into_vec result is Vec<i32>; slice.to_vec result is Vec<_>, preserving source element types.",
+          "checks": [
+            {
+              "group": "conversions",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F86",
+      "title": "Doctest get porównuje Option<&T> z &T",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/doc-panics-section.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "guidance",
+          "id": "F86",
+          "status": "completed",
+          "files": [
+            "rules/doc-panics-section.md"
+          ],
+          "resolution": "Vec::get doctest compares against Some(&2) and explicitly identifies the nonpanicking standard-library alternative.",
+          "checks": [
+            {
+              "group": "division-and-doctest",
+              "status": "pass",
+              "results": "local-verification/guidance-validation/results.json"
+            }
+          ],
+          "limitations": []
+        }
+      ]
+    },
+    {
+      "id": "F87",
+      "title": "Opis secrecy nie odpowiada przypiętej wersji i błędnie obiecuje Display",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/obs-no-sensitive-data.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F87",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/obs-no-sensitive-data.md",
+              "sha256": "4be11c7469a073bb6c3b5c554fa2dbc3ee601836896c118602a8e6ed07e370aa"
+            }
+          ],
+          "solution": "Przykład jest zgodny z secrecy 0.10: SecretString/SecretBox, redagujący Debug, brak Display i kontrolowany ExposeSecret; odróżniono lokalny newtype Secret od API crate.",
+          "validation": [
+            "secrecy_api"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F88",
+      "title": "thread::spawn zwraca JoinHandle, więc przykład z expect nie kompiluje się",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/anti-expect-lazy.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F88",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/anti-expect-lazy.md",
+              "sha256": "ca542dc1391332e64be5658c928300f68d17447b497b24e03319b88dcb36cc4f"
+            }
+          ],
+          "solution": "Przykład thread creation używa Builder::spawn zwracającego Result i świadomej polityki startup; opis uwzględnia retain/join oraz możliwość odzyskania po błędzie OS.",
+          "validation": [
+            "thread_creation"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F89",
+      "title": "Końcowe ? w load_user usuwa Result wymagany przez sygnaturę",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/err-lowercase-msg.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F89",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/err-lowercase-msg.md",
+              "sha256": "2423016557a2d6a6ea81f808573dc575519b5b5349e98d5f02396f0846b544b1"
+            }
+          ],
+          "solution": "Usunięto końcowe ? z ekspresji zwracającej Result<User>, zachowując contextual error.",
+          "validation": [
+            "context_result"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F90",
+      "title": "Indeksowanie nie wymusza bounds checks i nie uniemożliwia SIMD",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/anti-index-over-iter.md",
+        "rules/perf-iter-over-index.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F90",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/anti-index-over-iter.md",
+              "sha256": "01eb575c96105909b141e5672d8848d9e7750b81ed1658c1cbb0a2b8f063fd7d"
+            },
+            {
+              "path": "rules/perf-iter-over-index.md",
+              "sha256": "c73abfa61835abb1d18ee804f18df67aa192687a67fa1e883b4f4da3d8cc0634"
+            }
+          ],
+          "solution": "Zastąpiono obietnice every access/prevents SIMD opisem dowodzenia zakresu, możliwego usunięcia bounds checks i autowektoryzacji obu form. Indeksowane wersje nie są oznaczone jako niepoprawne. Przykład par używa chunks_exact_mut i swap bez podwójnego mut borrow.",
+          "validation": [
+            "static diff review; previous review LLVM IR supports corrected conditional claim"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F91",
+      "title": "Generyczne funkcje mogą być inlinowane między crate bez inline i LTO",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/opt-inline-always-rare.md",
+        "rules/opt-inline-small.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F91",
+          "status": "completed",
+          "files": [
+            "rules/opt-inline-always-rare.md",
+            "rules/opt-inline-small.md"
+          ],
+          "solution": "Opisano dostępność ciał funkcji generycznych downstream bez inline/LTO; inline przedstawiono jako wskazówkę kompilatora, a decyzję jako wynik pomiaru.",
+          "verification": "source/diff review; no new benchmark or Miri run",
+          "evidence": "original primary-source audit; corrected diff"
+        }
+      ]
+    },
+    {
+      "id": "F92",
+      "title": "collect nie zawsze tworzy nową alokację; pokazany pipeline może je wszystkie ponownie wykorzystać",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/anti-collect-intermediate.md",
+        "rules/perf-collect-once.md",
+        "rules/perf-iter-lazy.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F92",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/anti-collect-intermediate.md",
+              "sha256": "f564458828544e2d7878b52fcb9a3f93f2c8fefa8f6e0bd52ab8e248d4db2586"
+            },
+            {
+              "path": "rules/perf-collect-once.md",
+              "sha256": "6426d348f43ba0d23236d9703e7add838f77478a16e97a4ef2ae7c1c2c4fa504"
+            },
+            {
+              "path": "rules/perf-iter-lazy.md",
+              "sha256": "dfb1428b8e02778efab844322ea5619339cd17c4533e458ff55014e5673b9030"
+            }
+          ],
+          "solution": "Opis i tabele rozdzielają materializację/przebiegi od liczby alokacji i wyjaśniają możliwe in-place collect Vec::IntoIter oraz brak stabilnej gwarancji alokacyjnej.",
+          "validation": [
+            "static diff review; no new allocation benchmark claimed"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F93",
+      "title": "BufRead::lines tworzy osobny String dla każdej linii",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/perf-io-buffering.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F93",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/perf-io-buffering.md",
+              "sha256": "05bc3cee1502c1426e761a2f28ec09774b2dc0052589d057a8cb3a201e5b1e1f"
+            }
+          ],
+          "solution": "Good czyta bajtowe linie przez read_until i czyści/reużywa Vec; opis lines mówi o nowych String i UTF-8. Wolna wersja ma mut File, obsługę Interrupted i zgodne liczenie końcowego fragmentu.",
+          "validation": [
+            "lines"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F94",
+      "title": "CompactString mieści 24 bajty inline na celu 64-bitowym, a SmartString 23",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/mem-compact-string.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F94",
+          "status": "completed",
+          "files": [
+            "rules/mem-compact-string.md"
+          ],
+          "solution": "Pojemność inline jest podana w bajtach UTF-8, z warunkami architektury i różnicą między kopiowaniem inline a współdzieleniem sterty.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F95",
+      "title": "Porównanie size_of SmartString pomija wymagany parametr Mode",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/mem-compact-string.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F95",
+          "status": "completed",
+          "files": [
+            "rules/mem-compact-string.md"
+          ],
+          "solution": "SmartString ma jawny parametr LazyCompact lub odpowiedni alias; poprawiono rozmiary i przykłady.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F96",
+      "title": "Opis ThinVec błędnie neguje NPO Vec i nazywa pusty ThinVec null",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/mem-thinvec.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "root",
+          "id": "F96",
+          "status": "completed",
+          "files": [
+            "rules/mem-thinvec.md"
+          ],
+          "solution": "Poprawiono reprezentację pustego ThinVec i Option, odróżniono None od pustej kolekcji oraz usunięto bezwarunkowe twierdzenia o szybkości.",
+          "verification": "targeted regression and source review",
+          "evidence": "local-verification/core-validation/results.json"
+        }
+      ]
+    },
+    {
+      "id": "F97",
+      "title": "rename_all lowercase i UPPERCASE nie usuwają podkreśleń z nazw pól",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/serde-rename-all.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F97",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/serde-rename-all.md",
+              "sha256": "7a7da89f1622a880c102faaca01a2a18c36ec9eaea45e3606d32da1271e1950a"
+            }
+          ],
+          "solution": "Poprawiono UPPERCASE -> FOO_BAR i lowercase -> foo_bar dla pól; opis odróżnia pola od nazw wariantów.",
+          "validation": [
+            "prose_contracts::field_case_keeps_underscores"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F98",
+      "title": "Internally tagged enum dopuszcza także warianty unit",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/serde-enum-representation.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F98",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/serde-enum-representation.md",
+              "sha256": "f4bc1f866f198d0743ccc49a34096c86475ec90f8774a83f7510e46cf26e12b5"
+            }
+          ],
+          "solution": "Opis internally tagged dopuszcza unit; dodano Empty z dokumentowanym JSON, zakaz ograniczono do faktycznie niewspieranych kształtów.",
+          "validation": [
+            "tags"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F99",
+      "title": "log obsługuje structured fields przez feature kv",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/obs-tracing-over-log.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F99",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/obs-tracing-over-log.md",
+              "sha256": "aac40cc436ae93fb79309349f615a7e02c4f59b3197694800879f5001e0a80ec"
+            }
+          ],
+          "solution": "log ma w opisie i tabeli structured fields po włączeniu kv; brak spanów pozostaje odrębną różnicą.",
+          "validation": [
+            "prose_contracts::logging_kv_and_error_sources_are_distinct_from_debug"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F100",
+      "title": "Feature do mostu log w tracing-subscriber nazywa się tracing-log",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/obs-tracing-over-log.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F100",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/obs-tracing-over-log.md",
+              "sha256": "aac40cc436ae93fb79309349f615a7e02c4f59b3197694800879f5001e0a80ec"
+            }
+          ],
+          "solution": "Feature mostu nazywa się tracing-log; opisano domyślne włączenie i jednorazową inicjalizację LogTracer.",
+          "validation": [
+            "Cargo dependency resolution + compilation with tracing-subscriber/tracing-log"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    },
+    {
+      "id": "F101",
+      "title": "try_join anuluje bezpośrednie future przez synchroniczne zniszczenie",
+      "severity": "niska",
+      "status": "corrected",
+      "files": [
+        "rules/async-join-parallel.md"
+      ],
+      "verification_parts": [
+        {
+          "owner": "runtime",
+          "id": "F101",
+          "status": "completed",
+          "files": [
+            {
+              "path": "rules/async-join-parallel.md",
+              "sha256": "3c39341f999f90b7c642f4b09165a5774e4bc6ed6333edff592f83413445f749"
+            }
+          ],
+          "solution": "Opis try_join mówi o synchronicznym drop posiadanych futures, a osobno o pożyczonych futures, detached tasks i trwających skutkach I/O/blocking. Uzgodniono też opis w async-select-racing i async-try-join.",
+          "validation": [
+            "prose_contracts::owned_join_branch_is_dropped_before_return"
+          ],
+          "result": "pass for listed executed tests; static review where explicitly indicated",
+          "limitations": [
+            "Nie wykonano macierzy Rust 1.96/32-bit/Linux ani realnych usług zewnętrznych. Fragmenty domenowe są testowane z jawnymi stubami wyłącznie tam, gdzie brakuje kontekstu."
+          ]
+        }
+      ]
+    }
+  ],
+  "distribution": {
+    "prepared_date": "2026-10-24",
+    "repository": "https://github.com/rtmachines/rust-skills",
+    "branch": "master",
+    "evidence_note": "local-verification/... identifies historical logs retained locally; raw logs are not published. Use the checked-in regression scripts to reproduce applicable checks."
+  }
+}

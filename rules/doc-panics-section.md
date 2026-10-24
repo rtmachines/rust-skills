@@ -34,8 +34,9 @@ pub fn divide(a: i32, b: i32) -> i32 {
 /// # Examples
 ///
 /// ```
+/// // Vec::get is a non-panicking standard-library alternative.
 /// let v = vec![1, 2, 3];
-/// assert_eq!(v.get(1), &2);
+/// assert_eq!(v.get(1), Some(&2));
 /// ```
 pub fn get(&self, index: usize) -> &T {
     &self.data[index]
@@ -45,20 +46,17 @@ pub fn get(&self, index: usize) -> &T {
 ///
 /// # Panics
 ///
-/// Panics if `divisor` is zero.
+/// Panics if `divisor` is zero, or if `dividend == i32::MIN`
+/// and `divisor == -1` (division overflow, including release builds).
 ///
 /// For a non-panicking version, use [`checked_divide`].
 pub fn divide(dividend: i32, divisor: i32) -> i32 {
     dividend / divisor
 }
 
-/// Divides two numbers, returning `None` if the divisor is zero.
+/// Divides two numbers, returning `None` on zero divisor or division overflow.
 pub fn checked_divide(dividend: i32, divisor: i32) -> Option<i32> {
-    if divisor == 0 {
-        None
-    } else {
-        Some(dividend / divisor)
-    }
+    dividend.checked_div(divisor)
 }
 ```
 
@@ -67,7 +65,7 @@ pub fn checked_divide(dividend: i32, divisor: i32) -> Option<i32> {
 | Operation | Panic Condition |
 |-----------|-----------------|
 | Index access `[i]` | Index out of bounds |
-| Division `/`, `%` | Division by zero |
+| Integer division `/`, `%` | Zero divisor; signed `MIN / -1` or `MIN % -1`, even in release |
 | `.unwrap()` | `None` or `Err` value |
 | `.expect()` | `None` or `Err` value |
 | `slice::split_at(mid)` | `mid > len` |

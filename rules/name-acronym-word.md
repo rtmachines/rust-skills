@@ -48,7 +48,8 @@ std::net::TcpStream            // Not TCPStream
 std::net::TcpListener          // Not TCPListener
 std::net::UdpSocket            // Not UDPSocket
 std::net::IpAddr               // Not IPAddr
-std::io::IoError               // Not IOError (though Io is acceptable too)
+std::str::Utf8Error            // Not UTF8Error
+std::io::Error                 // I/O errors use the module name for context
 ```
 
 ## Two-Letter Acronyms

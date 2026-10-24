@@ -115,18 +115,17 @@ private_intra_doc_links = "warn"
 [lints]
 workspace = true
 
-# Binary entry point can use unwrap
-[lints.clippy]
-unwrap_used = "allow"
+# Keep inherited manifest lints. Add a narrow source attribute instead:
+# src/main.rs: #![allow(clippy::unwrap_used)]
 
 # test-utils/Cargo.toml
 [lints]
 workspace = true
 
-# Test utilities can print
-[lints.clippy]
-print_stdout = "allow"
+# src/lib.rs: #![allow(clippy::print_stdout)]
 ```
+
+A member cannot combine `[lints] workspace = true` with its own `[lints.*]` tables. For an intentional exception, use a source attribute at the narrowest useful scope. Alternatively, omit inheritance and provide a complete local lint table.
 
 ## CI Integration
 

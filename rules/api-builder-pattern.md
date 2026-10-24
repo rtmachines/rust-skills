@@ -31,13 +31,25 @@ struct Client {
 ## Good
 
 ```rust
-#[derive(Default)]
+use std::time::Duration;
+
 #[must_use = "builders do nothing unless you call build()"]
 pub struct ClientBuilder {
     base_url: Option<String>,
     timeout: Option<Duration>,
     max_retries: u32,
     auth_token: Option<String>,
+}
+
+impl Default for ClientBuilder {
+    fn default() -> Self {
+        Self {
+            base_url: None,
+            timeout: None,
+            max_retries: 3,
+            auth_token: None,
+        }
+    }
 }
 
 impl ClientBuilder {
@@ -170,7 +182,7 @@ impl ClientBuilder {
 ## Key Attributes
 
 ```rust
-#[derive(Default)]  // Enables MyBuilder::default()
+#[derive(Default)]  // Only when field defaults match the documented defaults
 #[must_use = "builders do nothing unless you call build()"]
 pub struct MyBuilder { ... }
 

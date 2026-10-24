@@ -106,9 +106,9 @@ fn process(input: &str) -> String {
 ## Allocation Patterns
 
 ```rust
-// Unnecessary allocation
-let vec: Vec<i32> = vec![];  // Creates capacity
-let vec: Vec<i32> = Vec::new();  // No allocation
+// Equivalent empty constructors: neither allocates.
+let vec: Vec<i32> = vec![];
+let vec: Vec<i32> = Vec::new();
 
 // Pre-allocation
 let mut vec = Vec::with_capacity(100);  // One allocation

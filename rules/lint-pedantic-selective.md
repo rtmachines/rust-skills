@@ -19,7 +19,7 @@ The `clippy::pedantic` group contains opinionated lints that aren't universally 
 # Cargo.toml - cherry-pick useful pedantic lints
 [lints.clippy]
 # Enable pedantic as baseline
-pedantic = "warn"
+pedantic = { level = "warn", priority = -1 }
 
 # Disable noisy ones
 missing_errors_doc = "allow"      # Document errors separately
@@ -59,7 +59,7 @@ must_use_candidate = "allow"      # Too many suggestions
 # Cargo.toml
 [lints.clippy]
 # Start with pedantic
-pedantic = "warn"
+pedantic = { level = "warn", priority = -1 }
 
 # Keep these
 doc_markdown = "warn"
@@ -77,6 +77,8 @@ too_many_lines = "allow"
 similar_names = "allow"
 struct_excessive_bools = "allow"
 ```
+
+Give a lint group a lower priority than individual exceptions. Cargo ignores TOML table order; equal-priority group and lint settings can trigger `clippy::lint_groups_priority`.
 
 ## Alternative: Explicit Opt-in
 

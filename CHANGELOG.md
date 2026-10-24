@@ -4,6 +4,24 @@ All notable changes to this skill are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/), and the project aims to follow
 semantic versioning for the rule set.
 
+## [1.5.1+local.1] - 2026-10-23
+
+### Distribution
+- Prepared for publication in `rtmachines/rust-skills` on 2026-10-24, with
+  corrected rules, regression sources and a portable finding ledger. Raw local
+  verification logs and build artifacts are excluded from version control.
+
+### Changed
+- Local corrections for all 101 confirmed findings in the Polish review of
+  commit `fd2a861ab0406a4ac536a55274d14ea6fd1ca9c9`, including unsafe API
+  boundaries, overflow, SIMD indexing, cancellation, resource cleanup,
+  compilation errors and conditional performance/tooling guidance.
+- Synchronized the generated index with the corrected rule summaries.
+- Added regression checks extracted from the current Markdown examples, and a
+  per-finding correction ledger in [LOCAL_CHANGES.md](LOCAL_CHANGES.md).
+- Preserved the original 265-rule structure and MIT license. This is a local
+  edition, not an upstream release or a global installation.
+
 ## [1.5.1]
 
 ### Changed

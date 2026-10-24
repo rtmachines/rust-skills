@@ -60,6 +60,8 @@ greet(literal);  // &str works directly
 
 ```rust
 // These coercions happen automatically:
+use std::sync::Arc;
+
 // Vec<T>  -> &[T]   (via Deref)
 // String  -> &str   (via Deref)
 // Box<T>  -> &T     (via Deref)
@@ -68,10 +70,10 @@ greet(literal);  // &str works directly
 fn process(data: &[u8]) { /* ... */ }
 
 let vec: Vec<u8> = vec![1, 2, 3];
+process(&vec);    // Borrow before consuming the Vec
 let boxed: Box<[u8]> = vec.into_boxed_slice();
 let arc: Arc<[u8]> = Arc::from(&[1, 2, 3][..]);
 
-process(&vec);    // Works
 process(&boxed);  // Works
 process(&arc);    // Works
 ```
@@ -82,10 +84,11 @@ process(&arc);    // Works
 // Bad
 fn read_config(path: &PathBuf) -> Config { /* ... */ }
 
-// Good - accepts &Path, &PathBuf, &str, &String
+// Good - accepts &Path and &PathBuf via deref coercion
+// Convert text explicitly with Path::new(text).
 fn read_config(path: &Path) -> Config { /* ... */ }
 
-// Even better - accept anything path-like
+// Alternative - also accepts &str and &String via AsRef<Path>
 fn read_config(path: impl AsRef<Path>) -> Config {
     let path = path.as_ref();
     // ...

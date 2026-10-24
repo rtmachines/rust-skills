@@ -1,10 +1,10 @@
 # mem-thinvec
 
-> Use `ThinVec<T>` for nullable collections with minimal overhead
+> Consider `ThinVec<T>` when many collection values make metadata size important
 
 ## Why It Matters
 
-Standard `Vec<T>` is 24 bytes even when empty. `ThinVec` from Mozilla's `thin_vec` crate uses a single pointer (8 bytes), storing length and capacity inline with the heap allocation. For Option<Vec<T>> patterns or structs with many optional vecs, this significantly reduces memory overhead.
+On a 64-bit target, `Vec<T>` occupies 24 bytes even when empty. `ThinVec` from the `thin-vec` crate uses one non-null pointer (8 bytes), storing length and capacity with heap data. Empty values point to a shared singleton without allocating. Both `Vec` and `ThinVec` support the null-pointer optimization for `Option`; ThinVec's metadata reduction comes from moving its header, not an exclusive ability to optimize `Option`.
 
 ## Bad
 
@@ -17,7 +17,7 @@ struct TreeNode {
 
 // Or using Option<Vec<T>>
 struct SparseData {
-    // Option<Vec> = 24 bytes (Vec is never null-pointer optimized)
+    // Option<Vec> = 24 bytes on 64-bit: NPO avoids an extra discriminant
     tags: Option<Vec<String>>,
     metadata: Option<Vec<Metadata>>,
     // 48 bytes for usually-None fields
@@ -31,14 +31,14 @@ use thin_vec::ThinVec;
 
 struct TreeNode {
     value: i32,
-    // Empty ThinVec is just a null pointer - 8 bytes
+    // Empty ThinVec points to a shared singleton - 8 bytes on 64-bit
     children: ThinVec<TreeNode>,
 }
 
 struct SparseData {
-    // ThinVec empty = 8 bytes each
-    tags: ThinVec<String>,
-    metadata: ThinVec<Metadata>,
+    // Keep Option if absent and present-but-empty have different meanings.
+    tags: Option<ThinVec<String>>,
+    metadata: Option<ThinVec<Metadata>>,
     // 16 bytes vs 48 bytes
 }
 ```
@@ -48,9 +48,9 @@ struct SparseData {
 ```rust
 use std::mem::size_of;
 
-// Standard Vec: always 24 bytes
+// Layout on a 64-bit target, thin-vec 0.2.21
 assert_eq!(size_of::<Vec<u8>>(), 24);
-assert_eq!(size_of::<Option<Vec<u8>>>(), 24);  // No NPO benefit
+assert_eq!(size_of::<Option<Vec<u8>>>(), 24);  // NPO: no extra discriminant
 
 // ThinVec: 8 bytes (one pointer)
 use thin_vec::ThinVec;
@@ -64,9 +64,9 @@ assert_eq!(size_of::<Option<ThinVec<u8>>>(), 8);  // Option is free!
 |---------|----------|--------------|
 | Size (empty) | 24 bytes | 8 bytes |
 | Size (non-empty) | 24 bytes | 8 bytes (header on heap) |
-| Option<T> optimization | No | Yes |
-| Cache locality | Better (len/cap on stack) | Worse (len/cap on heap) |
-| Iteration speed | Faster | Slightly slower |
+| Option<T> optimization | Yes | Yes |
+| Header access | len/cap in the value | len/cap behind the pointer |
+| Iteration speed | Measure for the workload | Measure for the workload |
 | API compatibility | Full | Vec-like |
 
 ## When to Use ThinVec
@@ -79,16 +79,16 @@ struct SparseGraph {
     edges: Vec<ThinVec<EdgeId>>,  // Saves 16 bytes per node
 }
 
-// ✅ Good: Nullable collection field
+// ✅ Good: Often-empty collection field (use Option to represent absence)
 struct Document {
     content: String,
     attachments: ThinVec<Attachment>,  // Often empty
 }
 
-// ❌ Avoid: Hot loops, performance-critical iteration
+// Benchmark before changing representation in a hot loop
 fn process_hot_path(data: &ThinVec<Item>) {
-    // Every length check goes through pointer indirection
-    for item in data {  // Vec would be faster here
+    // The header is indirect, but a loop need not reload it every iteration.
+    for item in data {
         process(item);
     }
 }

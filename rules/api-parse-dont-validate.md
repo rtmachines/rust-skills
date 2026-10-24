@@ -122,6 +122,12 @@ impl Percentage {
 
 ```rust
 // Parse at the system boundary (API, CLI, config file)
+struct Response {
+    email: Email,
+    age: Age,
+    username: Username,
+}
+
 fn handle_request(raw: RawRequest) -> Result<Response, Error> {
     // Parse ALL inputs upfront
     let email = Email::parse(&raw.email)?;
@@ -129,11 +135,12 @@ fn handle_request(raw: RawRequest) -> Result<Response, Error> {
     let username = Username::parse(&raw.username)?;
     
     // Now work with validated types
-    process_user(email, age, username)
+    Ok(process_user(email, age, username))
 }
 
-fn process_user(email: Email, age: Age, username: Username) {
-    // All inputs guaranteed valid - no checks needed
+fn process_user(email: Email, age: Age, username: Username) -> Response {
+    // This example builds a response from the validated inputs.
+    Response { email, age, username }
 }
 ```
 

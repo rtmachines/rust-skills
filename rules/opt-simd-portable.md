@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-SIMD (Single Instruction, Multiple Data) processes multiple values per instruction—4x, 8x, or more speedup for suitable algorithms. Rust's portable SIMD (nightly) and crates like `wide` provide cross-platform vectorization without architecture-specific intrinsics. For stable Rust, let LLVM auto-vectorize or use platform-specific crates.
+SIMD (Single Instruction, Multiple Data) processes multiple values per instruction. Lane count is not a guaranteed speedup: loading, reductions, memory bandwidth and the workload matter. Rust's portable SIMD is nightly-only; libraries such as `wide` provide stable alternatives. On stable Rust, also inspect whether LLVM already vectorizes the loop.
 
 ## Autovectorization (Stable)
 
@@ -21,16 +21,16 @@ fn add_arrays(a: &[f32], b: &[f32], out: &mut [f32]) {
 }
 
 // Help autovectorization:
-// 1. Use iterators over indexing
+// 1. Express simple traversal; iterators and indexed loops can both vectorize
 // 2. Avoid early exits in loops
-// 3. Use chunks_exact for aligned access
+// 3. Use chunks_exact for equal-sized groups (it does not ensure SIMD alignment)
 ```
 
 ## Portable SIMD (Nightly)
 
 ```rust
 #![feature(portable_simd)]
-use std::simd::*;
+use std::simd::{f32x8, num::SimdFloat};
 
 fn sum_simd(data: &[f32]) -> f32 {
     let (prefix, middle, suffix) = data.as_simd::<8>();
@@ -54,21 +54,22 @@ fn sum_simd(data: &[f32]) -> f32 {
 fn dot_product(a: &[f32], b: &[f32]) -> f32 {
     assert_eq!(a.len(), b.len());
     
-    let (a_pre, a_mid, a_suf) = a.as_simd::<8>();
-    let (b_pre, b_mid, b_suf) = b.as_simd::<8>();
-    
-    let scalar: f32 = a_pre.iter().zip(b_pre).map(|(x, y)| x * y).sum();
-    
+    // Partition by logical index, not each slice's independent alignment.
+    let mut a_chunks = a.chunks_exact(8);
+    let mut b_chunks = b.chunks_exact(8);
     let mut simd_sum = f32x8::splat(0.0);
-    for (av, bv) in a_mid.iter().zip(b_mid) {
-        simd_sum += *av * *bv;
+    for (ac, bc) in a_chunks.by_ref().zip(b_chunks.by_ref()) {
+        let av = f32x8::from_array(ac.try_into().unwrap());
+        let bv = f32x8::from_array(bc.try_into().unwrap());
+        simd_sum += av * bv;
     }
-    
-    let suffix: f32 = a_suf.iter().zip(b_suf).map(|(x, y)| x * y).sum();
-    
-    scalar + simd_sum.reduce_sum() + suffix
+    let tail: f32 = a_chunks.remainder().iter()
+        .zip(b_chunks.remainder()).map(|(x, y)| x * y).sum();
+    simd_sum.reduce_sum() + tail
 }
 ```
+
+Independent `as_simd` calls may produce different prefix lengths even for equal-length slices. Zipping those partitions can pair different logical indices and skip values. Loading equal-sized arrays avoids that mismatch. SIMD reductions may still differ from scalar accumulation because floating-point addition is not associative.
 
 ## wide Crate (Stable)
 

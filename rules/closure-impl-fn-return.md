@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-`impl Fn` in return position names the closure's concrete (but unnameable) type and enables static dispatch with no heap allocation. `Box<dyn Fn>` adds an allocation and a virtual call every time the closure is invoked. The opaque `impl Trait` syntax was designed precisely for this use case. Reach for `Box<dyn Fn>` only when the function must return *different* closure types depending on runtime conditions, or when the closure must be stored in a struct field or collection.
+`impl Fn` in return position hides one concrete callable type and enables static dispatch without requiring heap allocation. `Box<dyn Fn>` erases the callable's type and typically adds allocation and indirect-call costs. Use it when owning heterogeneous callbacks is useful. A generic struct can store one concrete closure type, and noncapturing closures can coerce to a common function pointer; merely storing or returning a closure does not require boxing.
 
 ## Bad
 
@@ -46,21 +46,25 @@ fn demo() {
 
 ## Key Points
 
-**When `Box<dyn Fn>` is required:**
+**When `Box<dyn Fn>` is useful:**
 
-Different `if`/`match` arms return distinct closure types, so `impl Fn` cannot unify them:
+Different capturing closures have distinct types. Boxing is one way to erase those differences; a single closure containing the condition is another. These noncapturing branches can instead coerce to one function-pointer type:
 
 ```rust
-fn make_transform(double: bool) -> Box<dyn Fn(i32) -> i32> {
+fn make_transform(double: bool) -> fn(i32) -> i32 {
     if double {
-        Box::new(|x| x * 2)   // one concrete type
+        |x| x * 2
     } else {
-        Box::new(|x| x + 100) // different concrete type
+        |x| x + 100
     }
-    // `impl Fn` would fail: "expected closure, found a different closure"
 }
 
-// Storing heterogeneous closures also requires boxing:
+// One capturing closure also works with return-position impl Fn.
+fn make_capturing_transform(double: bool, offset: i32) -> impl Fn(i32) -> i32 {
+    move |x| if double { x * 2 } else { x + offset }
+}
+
+// Boxing is convenient for an open collection of heterogeneous closures:
 struct Pipeline {
     steps: Vec<Box<dyn Fn(i32) -> i32>>,
 }

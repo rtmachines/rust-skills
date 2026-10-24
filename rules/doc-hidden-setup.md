@@ -123,17 +123,19 @@ Sometimes setup IS the point—don't hide it:
 
 ## Pattern: `ignore` and `no_run`
 
-For examples that shouldn't run in tests:
+For examples that should compile but not execute, use `no_run`. It does not create an async context: async calls still need an async function or block. `ignore` skips both compilation and execution.
 
 ```rust
 /// # Examples
 ///
 /// ```no_run
 /// # use my_crate::Server;
+/// # async fn example() -> Result<(), my_crate::Error> {
 /// // This would actually start a server - don't run in tests
 /// let server = Server::bind("0.0.0.0:8080").await?;
 /// server.run().await?;
-/// # Ok::<(), my_crate::Error>(())
+/// # Ok(())
+/// # }
 /// ```
 
 /// ```ignore

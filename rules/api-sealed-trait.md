@@ -133,24 +133,44 @@ pub trait ValidConfig: private::Sealed {}
 
 ## Partially Sealed
 
+Separate the open customization trait from the sealed lifecycle trait. External code implements `PluginName` and passes it to the library-owned `ManagedPlugin`; it cannot replace lifecycle methods.
+
 ```rust
-// Allow implementing some methods but not all
 mod private {
     pub trait SealedCore {}
 }
 
-pub trait Plugin: private::SealedCore {
-    // Sealed - only we implement
-    fn initialize(&self);
-    fn shutdown(&self);
-    
-    // Open - users can override
+// Open extension point: downstream crates can implement this trait.
+pub trait PluginName {
     fn name(&self) -> &str { "unnamed" }
 }
 
-// Only we can add new required sealed methods
-// Users can customize open methods
+pub struct ManagedPlugin<N> {
+    naming: N,
+}
+
+impl<N: PluginName> ManagedPlugin<N> {
+    pub fn new(naming: N) -> Self {
+        Self { naming }
+    }
+}
+
+impl<N: PluginName> private::SealedCore for ManagedPlugin<N> {}
+
+pub trait Plugin: private::SealedCore {
+    fn initialize(&self);
+    fn shutdown(&self);
+    fn name(&self) -> &str;
+}
+
+impl<N: PluginName> Plugin for ManagedPlugin<N> {
+    fn initialize(&self) { println!("initializing {}", self.name()); }
+    fn shutdown(&self) { println!("shutting down {}", self.name()); }
+    fn name(&self) -> &str { self.naming.name() }
+}
 ```
+
+Adding a default method to a sealed trait does not let external code override it. An explicit open extension point, such as `PluginName`, is needed for customization.
 
 ## When to Seal
 

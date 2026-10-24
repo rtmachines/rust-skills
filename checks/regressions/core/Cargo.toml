@@ -1,0 +1,16 @@
+[package]
+name = "rust-skills-core-regressions"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+path = "target/review/lib.rs"
+
+[dependencies]
+bumpalo = { version = "=3.20.3", features = ["boxed", "collections"] }
+compact_str = "=0.9.1"
+smartstring = "=1.0.1"
+thin-vec = "=0.2.21"

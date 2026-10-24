@@ -107,19 +107,19 @@ fn invalid_input_returns_error() {
 }
 ```
 
-## Combining with Result
+## Using Fallible Setup
+
+`#[should_panic]` cannot be combined with a `Result` return type. Use a specific expected panic message, or use a normal `Result`-returning test with `catch_unwind` when you need to inspect the result after unwinding.
 
 ```rust
 #[test]
-#[should_panic]
-fn test_panics() -> Result<(), Error> {
-    // Can combine with Result for setup
-    let data = setup_test_data()?;
-    
-    // This should panic
+#[should_panic(expected = "invalid data")]
+fn test_panics() {
+    // should_panic tests must return (). Handle setup errors explicitly.
+    let data = setup_test_data().expect("test setup must succeed");
+
+    // The expected message distinguishes this panic from a setup failure.
     process_invalid(&data);
-    
-    Ok(())  // Never reached
 }
 ```
 

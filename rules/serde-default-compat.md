@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Without `#[serde(default)]`, any field missing from an incoming payload causes deserialization to fail with a "missing field" error. When you add new fields to a struct over time, older payloads that predate those fields will suddenly break. Marking fields (or the whole container) with `#[serde(default)]` fills missing keys from the type's `Default` implementation, enabling graceful forward compatibility.
+Missing required fields ordinarily cause a "missing field" error. Ordinary derived `Option<T>` fields are an exception: they can deserialize an absent key as `None` without this attribute. When you add new fields to a struct over time, older payloads that predate those fields will suddenly break. Marking fields (or the whole container) with `#[serde(default)]` fills missing keys from the type's `Default` implementation, allowing new code to read older payloads. This does not by itself make old code accept every newer payload.
 
 ## Bad
 
@@ -58,7 +58,7 @@ struct FeatureFlags {
 - **Field-level** `#[serde(default)]` — fills only that field; other required fields still fail if absent.
 - **Field-level** `#[serde(default = "path")]` — calls a user-supplied function `fn() -> T`; use this when `Default` would produce the wrong value (e.g. `timeout = 30` rather than `0`).
 - **Container-level** `#[serde(default)]` — applies to every field; the struct must implement `Default` (or `#[derive(Default)]`). Convenient for all-optional structs like feature-flag configs.
-- The default function signature must be `fn() -> T` with no arguments and no generics.
+- The default function must be callable with no arguments and return the field type; generic functions are allowed when their parameters can be inferred.
 - `#[serde(default)]` only affects **deserialization**. It has no effect on serialization; pair with `#[serde(skip_serializing_if = "...")]` if you also want to omit defaults on the way out.
 
 ## Caveats

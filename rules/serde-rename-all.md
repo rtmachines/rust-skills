@@ -61,10 +61,10 @@ enum Status {
 | `"kebab-case"` | `foo-bar` |
 | `"SCREAMING_SNAKE_CASE"` | `FOO_BAR` |
 | `"snake_case"` | `foo_bar` (identity) |
-| `"UPPERCASE"` | `FOOBAR` |
-| `"lowercase"` | `foobar` |
+| `"UPPERCASE"` | `FOO_BAR` |
+| `"lowercase"` | `foo_bar` |
 
-A field-level `#[serde(rename = "...")]` always wins over the container-level `rename_all`, so use it for exceptions like reserved words or one-off mismatches. For enums, `rename_all` applies to variant names.
+A field-level `#[serde(rename = "...")]` always wins over the container-level `rename_all`, so use it for exceptions like reserved words or one-off mismatches. For enums, `rename_all` applies to variant names. Serde transforms field and variant names differently: the table above is for struct fields; `lowercase` leaves a snake_case field unchanged and `UPPERCASE` preserves its underscores.
 
 ## See Also
 

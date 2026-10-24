@@ -1,10 +1,10 @@
 # anti-lock-across-await
 
-> Don't hold locks across await points
+> Avoid synchronous guards across await; keep async locks for the scope required by the invariant
 
 ## Why It Matters
 
-Holding a `Mutex` or `RwLock` guard across an `.await` causes the lock to be held while the task is suspended. Other tasks waiting for the lock block indefinitely. With `std::sync::Mutex`, this is even worse—it can deadlock the entire runtime.
+Holding a `Mutex` or `RwLock` guard across an `.await` causes the lock to be held while the task is suspended. Other users cannot acquire the lock until it is released. A blocking `std::sync::Mutex` acquisition can deadlock executor progress when its owner is suspended. A Tokio mutex deliberately supports guards across await, for example to serialize access to an I/O connection; unnecessary long lock scopes still reduce concurrency.
 
 ## Bad
 
@@ -19,7 +19,7 @@ async fn bad_std_mutex(data: &Mutex<Vec<i32>>) {
     guard.push(42);
 }
 
-// BLOCKS OTHER TASKS: tokio Mutex held across await
+// Avoidable contention if this network call does not need the protected Vec
 async fn bad_async_mutex(data: &AsyncMutex<Vec<i32>>) {
     let mut guard = data.lock().await;
     slow_network_call().await;  // Lock held for entire call!
@@ -33,7 +33,8 @@ async fn bad_async_mutex(data: &AsyncMutex<Vec<i32>>) {
 use std::sync::Mutex;
 use tokio::sync::Mutex as AsyncMutex;
 
-// Release lock before await
+// This operation accepts a snapshot; intervening Vec changes are allowed.
+// If it were a read-modify-write transaction, this split would not be equivalent.
 async fn good_approach(data: &Mutex<Vec<i32>>) {
     let value = {
         let guard = data.lock().unwrap();
@@ -91,10 +92,11 @@ struct BetterService {
 }
 
 impl BetterService {
-    async fn request(&self, key: String) -> Data {
+    async fn request(&self, key: String) -> anyhow::Result<Data> {
         let (tx, rx) = oneshot::channel();
-        self.sender.send(Request { key, respond: tx }).await?;
-        rx.await?
+        self.sender.send(Request { key, respond: tx }).await
+            .map_err(|_| anyhow::anyhow!("service queue closed"))?;
+        Ok(rx.await?)
     }
 }
 ```
@@ -103,13 +105,13 @@ impl BetterService {
 
 | Type | Safe Across Await? |
 |------|--------------------|
-| `std::sync::Mutex` guard | **NO** - can deadlock |
-| `std::sync::RwLock` guard | **NO** - can deadlock |
-| `tokio::sync::Mutex` guard | Allowed but blocks tasks |
-| `tokio::sync::RwLock` guard | Allowed but blocks tasks |
-| Owned values | Yes |
-| `Arc<T>` | Yes |
-| References | Depends on lifetime |
+| `std::sync::Mutex` guard | Avoid: can block executor progress; ordinary guards also prevent Send |
+| `std::sync::RwLock` guard | Avoid: blocking acquisition can deadlock executor progress |
+| `tokio::sync::Mutex` guard | Supported; retain when serialization across I/O is required |
+| `tokio::sync::RwLock` guard | Supported; consider contention, ordering and deadlocks |
+| Owned values | Lifetime is owned; Send depends on the value |
+| `Arc<T>` | Send/Sync depend on T; cloning does not change them |
+| References | Lifetime and Send/Sync constraints must hold |
 
 ## Detection
 

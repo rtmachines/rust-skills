@@ -21,7 +21,7 @@ pub fn do_thing() {}
 ```
 
 ```toml
-# Cargo.toml — readme field absent; crates.io shows nothing
+# Cargo.toml — README.md is auto-detected when present in the package root
 [package]
 name = "my-crate"
 version = "0.1.0"
@@ -46,6 +46,8 @@ edition = "2024"
 readme = "README.md"          # crates.io landing page
 documentation = "https://docs.rs/my-crate"
 ```
+
+An omitted `readme` field still auto-detects `README.md`, `README.txt`, or `README` in the package root. The explicit setting above documents the intended file; `readme = false` disables auto-detection.
 
 ## Handling Non-Rust Code Blocks in README
 

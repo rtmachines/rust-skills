@@ -19,7 +19,7 @@ struct SharedCounter {
 }
 
 unsafe impl Sync for SharedCounter {} // data race waiting to happen — no SAFETY comment
-unsafe impl Send for SharedCounter {} // likewise
+unsafe impl Send for SharedCounter {} // redundant: Cell<u32> already is Send
 ```
 
 ```rust
@@ -61,9 +61,9 @@ struct OwnedBuffer {
     len: usize,
 }
 
-// SAFETY: OwnedBuffer owns its allocation exclusively (no aliasing),
-// and access is protected by the caller's Mutex<OwnedBuffer> at usage sites.
-// The pointer is valid for the entire lifetime of OwnedBuffer.
+// SAFETY: this abstraction must enforce exclusive allocation ownership in
+// every constructor and method, with no thread-affine access or destruction.
+// Moving it transfers that ownership; no caller-provided Mutex is assumed.
 unsafe impl Send for OwnedBuffer {}
 
 // SAFETY: OwnedBuffer exposes no shared mutation — all methods require &mut self.
@@ -86,11 +86,11 @@ fn make_shared() -> Arc<SafeCounter> {
 
 ## Key Points
 
-- **Auto-derive first**: if your type consists entirely of `Send`/`Sync` fields, the compiler derives the traits for free. Only reach for manual impls when raw pointers, `Cell`, or other non-auto types are involved.
+- **Auto-derive first**: if the fields satisfy the required auto traits, let the compiler implement them. Raw pointers may require a manual proof; `Cell<T>` already implements `Send` when `T: Send`, but never `Sync`.
 - **`PhantomData<*const T>`** is the canonical way to make a type `!Send + !Sync` — `*const T` is already `!Send + !Sync`, so the marker propagates without any `unsafe impl`.
-- **`PhantomData<*mut T>`** makes a type `!Send + !Sync` and also marks it as if it mutably borrows a `T` (useful for invariance over `T`).
+- **`PhantomData<*mut T>`** makes a type `!Send + !Sync` and invariant over `T`; it does not represent a lifetime-bounded exclusive borrow. Use `PhantomData<&'a mut T>` when that is the relationship to encode.
 - Every `unsafe impl Send`/`unsafe impl Sync` must carry a `// SAFETY:` comment explaining which invariant the programmer is upholding and why it holds.
-- Adding `unsafe impl Send` to a type that contains a `Rc<T>` or `Cell<T>` is almost certainly unsound — prefer `Arc<T>` and `Mutex<T>` instead.
+- `Rc<T>` is neither `Send` nor `Sync`. Moving exclusively owned `Cell<T>` between threads is allowed when `T: Send`; sharing its non-atomic mutation through `Sync` is not. Choose `Arc` and synchronization when shared access is actually needed, and prove all fields and methods before overriding an auto-trait decision.
 
 ## See Also
 

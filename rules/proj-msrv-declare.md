@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Setting `package.rust-version` causes Cargo to emit a clear, actionable error when the installed toolchain is too old, instead of a cryptic type or feature error deep inside your code. The 2024-edition resolver (resolver = "3", the default for edition 2024) is MSRV-aware: it will avoid selecting dependency versions whose own `rust-version` field exceeds yours, preventing accidental MSRV breakage from transitive upgrades. Without a declared MSRV, you have no contract with downstream users and no CI gate to catch regressions.
+Setting `package.rust-version` causes Cargo to emit a clear, actionable error when the installed toolchain is too old, instead of a cryptic type or feature error deep inside your code. The 2024-edition resolver (resolver = "3", the default for edition 2024) is MSRV-aware: it prefers compatible dependency versions when possible, but this fallback is not a guarantee that every resolved dependency supports your MSRV. Edition 2024 itself requires Rust 1.85 or newer; test the resolved dependency graph on your declared compiler floor. Without a declared MSRV, you have no contract with downstream users and no CI gate to catch regressions.
 
 ## Bad
 
@@ -24,7 +24,7 @@ edition = "2021"
 name = "my-crate"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.80"  # oldest toolchain you commit to supporting
+rust-version = "1.85"  # oldest toolchain you commit to supporting
 
 [workspace]
 resolver = "3"  # default for edition 2024; enables MSRV-aware dep resolution
@@ -37,7 +37,7 @@ CI job pinning the MSRV toolchain (GitHub Actions example):
 - name: Install MSRV toolchain
   uses: dtolnay/rust-toolchain@master
   with:
-    toolchain: "1.80"
+    toolchain: "1.85"
 
 - name: Check MSRV
   run: cargo check --all-features
@@ -47,7 +47,7 @@ CI job pinning the MSRV toolchain (GitHub Actions example):
 
 - Pick the oldest stable toolchain your users are realistically running (check distro packages, embedded targets, corporate freeze windows).
 - Do not go lower than needed — a lower MSRV widens the set of eligible dependency versions and can force you onto older, buggier releases.
-- When you bump MSRV, treat it as a semver-minor change (for libraries) and document it in your changelog.
+- Follow your library's published compatibility policy when raising MSRV, and document the change in your changelog; do not assume every downstream user accepts a minor-release MSRV increase.
 - Run `cargo msrv` (the `cargo-msrv` tool) to find the actual floor automatically.
 
 ## See Also

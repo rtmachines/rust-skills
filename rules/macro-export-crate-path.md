@@ -40,10 +40,13 @@ macro_rules! greet {
     };
 }
 
-// Re-export so `use mylib::greet;` resolves through the crate's public path.
-// (The re-export is implicit when using #[macro_export]; this is just for clarity
-// or when you want to place it under a module path.)
-pub use greet;
+// #[macro_export] already exposes mylib::greet. Do not re-import it at the root.
+#[doc(hidden)]
+pub mod __private {
+    pub fn print_greeting(name: &str) {
+        println!("hello, {}", name);
+    }
+}
 ```
 
 ```rust

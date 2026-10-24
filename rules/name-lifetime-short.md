@@ -69,13 +69,14 @@ impl User {
 ```rust
 use serde::{Deserialize, Serialize};
 
-// 'de is the standard serde lifetime for borrowed data
+// Deserialize<'de> names the input lifetime in trait implementations.
+// For a derived type, use a different name: the derive declares its own 'de.
 #[derive(Deserialize)]
-struct Request<'de> {
+struct Request<'a> {
     #[serde(borrow)]
-    name: &'de str,
+    name: &'a str,
     #[serde(borrow)]
-    tags: Vec<&'de str>,
+    tags: Vec<&'a str>,
 }
 ```
 

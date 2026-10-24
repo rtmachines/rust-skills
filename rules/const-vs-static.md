@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-`const` items are substituted at each use site: the compiler copies the value inline, there is no fixed memory address, and the value counts against no storage. This is ideal for small configuration values, bitmasks, and magic numbers. `static` items live at a single address for the entire program lifetime and expose a `'static` reference — use them for large lookup tables you do not want duplicated, or when a `&'static T` is required. Avoid `static mut`: referencing it is a hard error in the 2024 edition. For mutable global state, use atomics (`AtomicUsize`, etc.) or `std::sync::OnceLock`/`std::sync::LazyLock`.
+`const` items are values substituted at use sites, without a guaranteed unique address; this does not guarantee zero emitted storage. They are useful for small configuration values, bitmasks, and magic numbers. `static` items provide one allocation for the program lifetime — use them for large shared lookup tables or when address identity matters. Suitable constants can also be promoted and borrowed for `'static`. Avoid `static mut`: edition 2024 denies creation of references to it by default through `static_mut_refs`. The declaration and unsafe value reads/writes are not themselves forbidden. For mutable global state, prefer atomics (`AtomicUsize`, etc.) or `std::sync::OnceLock`/`std::sync::LazyLock`.
 
 ## Bad
 
@@ -12,7 +12,8 @@
 // large table as `const` — potentially duplicated at every use site
 const LOOKUP: [u8; 256] = [0u8; 256];
 
-// `static mut` — unsafe to read and a hard error in edition 2024
+// `static mut` — reads/writes require unsafe; references are denied by default
+// in edition 2024. Prefer synchronized interior mutability instead.
 static mut COUNTER: u64 = 0;
 
 // `static` for a tiny value — needlessly takes an address
@@ -37,7 +38,8 @@ fn process(byte: u8) -> u8 {
     LOOKUP[byte as usize]
 }
 
-// `&'static str` requires a `static` (or a string literal)
+// One shared binding for &'static str; literals and promoted constants
+// can also provide this lifetime without a static declaration.
 static APP_NAME: &str = "my-app";
 
 // mutable global state — use atomics, not `static mut`
@@ -67,7 +69,7 @@ fn set_greeting(name: &str) {
 | Small constant (number, bool, tiny array) | `const` |
 | String literal | `const` or `static` (both work; prefer `const`) |
 | Large lookup table | `static` |
-| Need `&'static T` | `static` |
+| Need one shared allocation with a `'static` reference | `static` (eligible constants can also provide `'static` borrows) |
 | Mutable counter / flag | `static AtomicXxx` |
 | Lazily initialized value | `static LazyLock<T>` |
 | Single-writer initialization | `static OnceLock<T>` |

@@ -35,16 +35,16 @@ let rx2 = rx.clone();
 tokio::spawn(async move {
     let mut rx = rx1;
     while rx.changed().await.is_ok() {
-        let config = rx.borrow();
+        let config = rx.borrow_and_update();
         apply_config(&*config);
     }
 });
 
-// Observer 2: also sees all changes
+// Observer 2: sees the latest value when notified, possibly skipping intermediate updates
 tokio::spawn(async move {
     let mut rx = rx2;
     while rx.changed().await.is_ok() {
-        let config = rx.borrow();
+        let config = rx.borrow_and_update();
         log_config_change(&*config);
     }
 });
@@ -82,6 +82,7 @@ assert_eq!(*rx.borrow(), "v3");  // Skipped v1, v2
 use tokio::sync::watch;
 use std::sync::Arc;
 
+#[derive(PartialEq)]
 struct AppConfig {
     log_level: Level,
     max_connections: usize,
@@ -94,7 +95,7 @@ async fn config_watcher(tx: watch::Sender<Arc<AppConfig>>) {
         if let Ok(new_config) = reload_config_from_disk() {
             // Only notifies if value actually changed
             tx.send_if_modified(|current| {
-                if *current != new_config {
+                if current.as_ref() != &new_config {
                     *current = Arc::new(new_config);
                     true
                 } else {
@@ -108,8 +109,11 @@ async fn config_watcher(tx: watch::Sender<Arc<AppConfig>>) {
 async fn worker(mut config_rx: watch::Receiver<Arc<AppConfig>>) {
     loop {
         tokio::select! {
-            _ = config_rx.changed() => {
-                let config = config_rx.borrow().clone();
+            changed = config_rx.changed() => {
+                if changed.is_err() {
+                    break; // No more configuration updates; do not spin on Err
+                }
+                let config = config_rx.borrow_and_update().clone();
                 reconfigure(&config);
             }
             _ = do_work() => {}
@@ -155,7 +159,7 @@ impl Connection {
 ```rust
 use tokio::sync::watch;
 
-let (tx, rx) = watch::channel(vec![1, 2, 3]);
+let (tx, mut rx) = watch::channel(vec![1, 2, 3]);
 
 // borrow() returns Ref - must not hold across await
 {

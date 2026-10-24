@@ -1,10 +1,10 @@
 # async-no-lock-await
 
-> Never hold `Mutex`/`RwLock` across `.await`
+> Avoid blocking guards across await; choose async lock scope to preserve the protected operation
 
 ## Why It Matters
 
-Holding a lock across an `.await` point can cause deadlocks and severely hurt performance. The task may be suspended while holding the lock, blocking all other tasks waiting for it - potentially indefinitely.
+Holding a lock across an `.await` point can cause deadlocks and severely hurt performance. The owner may suspend while others wait. Blocking lock acquisition can stop executor progress; Tokio mutex/RwLock acquisition suspends the waiter instead. Async guards are intended to span await when a resource needs serialized ownership. Keep such a scope deliberate and avoid awaiting code that reacquires the same lock.
 
 ## Bad
 
@@ -14,13 +14,13 @@ use tokio::sync::Mutex;
 async fn bad_update(state: &Mutex<State>) {
     let mut guard = state.lock().await;
     
-    // BAD: Lock held across await!
+    // Unnecessary contention if this fetch is independent of protected state
     let data = fetch_from_network().await;
     
     guard.value = data;
 }  // Lock finally released
 
-// This can deadlock or starve other tasks
+// Holding a Tokio guard is supported; this scope may be needlessly long.
 ```
 
 ## Good
@@ -37,7 +37,8 @@ async fn good_update(state: &Mutex<State>) {
     guard.value = data;
 }  // Lock released immediately
 
-// Alternative: Clone data out, process, then update
+// Alternative: snapshot an immutable ID, process, then update.
+// Contract here: State.id does not change while State is in use.
 async fn good_update_v2(state: &Mutex<State>) {
     // Extract what we need
     let id = {
@@ -53,6 +54,8 @@ async fn good_update_v2(state: &Mutex<State>) {
 }
 ```
 
+Extraction examples below assume snapshot results may be applied after concurrent activity. If that is not the contract, retain an async lock for the operation, validate a version before applying the result, or use one task to own the transaction. Splitting a lock scope must not silently change atomicity.
+
 ## The Problem Visualized
 
 ```rust
@@ -63,7 +66,7 @@ expensive_io().await;              // Suspended, still holding lock!
 drop(guard);                       // Finally releases
 
 // Task B, C, D:
-let guard = mutex.lock().await;    // All blocked waiting for A!
+let guard = mutex.lock().await;    // Other tasks suspend until A releases the async mutex.
 ```
 
 ## Patterns for Extraction
@@ -111,7 +114,7 @@ async fn state_manager(
 use tokio::sync::RwLock;
 
 async fn read_heavy(state: &RwLock<State>) {
-    // Multiple readers OK, but still don't hold across await
+    // Clone a snapshot when the processing does not require a stable locked view
     let value = {
         let guard = state.read().await;
         guard.value.clone()
@@ -131,7 +134,7 @@ async fn read_heavy(state: &RwLock<State>) {
 // Prefer std::sync::Mutex for work that does NOT span an .await —
 // it is simpler, faster, and avoids the async overhead.
 // Only reach for tokio::sync::Mutex when you genuinely must hold
-// the lock across an .await point (rare; usually a sign to redesign).
+// the lock across an .await point, such as serializing a shared I/O resource.
 
 // std::sync::Mutex in async (quick, non-awaiting operation — preferred):
 async fn quick_update(state: &std::sync::Mutex<State>) {
@@ -141,8 +144,9 @@ async fn quick_update(state: &std::sync::Mutex<State>) {
 // tokio::sync::Mutex (only when the lock scope must span an .await):
 async fn must_await_inside(state: &tokio::sync::Mutex<State>) {
     let mut guard = state.lock().await;
-    // Only justified if you truly need the lock held across an async op
-    // (usually you don't — extract data first, then release the lock)
+    // Required when State owns one connection and this exchange must be serialized.
+    // Do not call back into code that tries to lock the same State.
+    guard.connection.exchange().await;
 }
 ```
 

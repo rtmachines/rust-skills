@@ -4,12 +4,12 @@
 
 ## Why It Matters
 
-Iterators are the idiomatic way to traverse collections in Rust. They enable bounds check elimination, SIMD auto-vectorization, and cleaner code. Manual indexing (`for i in 0..len`) often prevents these optimizations and introduces off-by-one error risks.
+Iterators are the idiomatic way to traverse collections in Rust. They enable bounds check elimination, SIMD auto-vectorization, and cleaner code. Manual indexing can also receive these optimizations when its range is provably valid, such as 0..data.len(). Prefer the clearest traversal; verify material performance differences in optimized code instead of inferring them from syntax.
 
-## Bad
+## Index-Based Version
 
 ```rust
-// Manual indexing - bounds checked every iteration
+// The range can let the optimizer prove each index is in bounds
 fn sum_squares(data: &[i32]) -> i64 {
     let mut sum = 0i64;
     for i in 0..data.len() {
@@ -35,7 +35,7 @@ fn double_values(data: &mut [i32]) {
 }
 ```
 
-## Good
+## Iterator Version
 
 ```rust
 // Iterator - bounds checks eliminated, SIMD-friendly
@@ -84,7 +84,7 @@ fn interleave(data: &mut [i32]) {
 
 | Pattern | Bounds Checks | SIMD Potential | Clarity |
 |---------|---------------|----------------|---------|
-| `for i in 0..len` | Every access | Limited | Medium |
+| `for i in 0..data.len()` | Can be eliminated | Can vectorize | Depends on the operation |
 | `for &x in slice` | None | High | High |
 | `.iter().enumerate()` | None | Medium | High |
 | `get_unchecked` | None (unsafe) | High | Low |

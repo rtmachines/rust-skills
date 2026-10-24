@@ -4,14 +4,14 @@
 
 ## Why It Matters
 
-Standard `String` is 24 bytes (pointer + length + capacity). For applications storing millions of short strings, this overhead dominates. Compact string libraries like `compact_str`, `smartstring`, or `ecow` store small strings inline (no heap allocation) and use optimized layouts for larger strings.
+On a 64-bit target, standard `String` has 24 bytes of metadata (pointer, length and capacity). For many short strings, metadata and separate allocations can dominate memory use. Libraries such as `compact_str`, `smartstring`, and `ecow` store short strings inline. Capacity limits count UTF-8 bytes, not characters; the numbers below describe the listed library versions on 64-bit targets.
 
 ## Bad
 
 ```rust
 struct User {
     id: u64,
-    // Most usernames are < 24 chars, but String is always 24 bytes + heap
+    // Short nonempty usernames still need String metadata and a heap buffer
     username: String,
     email: String,
 }
@@ -27,7 +27,7 @@ use compact_str::CompactString;
 
 struct User {
     id: u64,
-    // CompactString: 24 bytes, but strings ≤ 23 bytes are inline (no heap)
+    // CompactString 0.9: 24 bytes; up to 24 UTF-8 bytes can be stored inline
     username: CompactString,
     email: CompactString,
 }
@@ -43,7 +43,7 @@ struct User {
 ```rust
 use compact_str::CompactString;
 
-// Inline storage for strings ≤ 23 bytes
+// Inline storage for strings ≤ 24 bytes on 64-bit (≤ 12 on 32-bit)
 let small: CompactString = "hello".into();  // No heap allocation
 
 // Automatic heap fallback for larger strings
@@ -64,7 +64,8 @@ let s = format_compact!("value: {}", 42);
 ```rust
 use smartstring::{SmartString, LazyCompact};
 
-// Default is LazyCompact: 24 bytes inline capacity
+// Explicit mode: 23 bytes inline capacity on 64-bit (11 on 32-bit).
+// smartstring::alias::String is the convenient LazyCompact alias.
 let s: SmartString<LazyCompact> = "short string".into();
 
 // Compact mode: 23 bytes inline on 64-bit
@@ -77,11 +78,11 @@ let s: SmartString<Compact> = "hello".into();
 ```rust
 use ecow::EcoString;
 
-// Clone is O(1) - shares underlying data
+// Clone is cheap: inline content is copied; heap-backed content is shared.
 let s1: EcoString = "shared data".into();
-let s2 = s1.clone();  // Cheap, shares allocation
+let s2 = s1.clone();  // This short inline string does not need an allocation
 
-// Copy-on-write: only allocates on mutation
+// Mutation may allocate when growing beyond inline capacity or unsharing data
 let mut s3 = s1.clone();
 s3.push_str(" modified");  // Now allocates
 ```
@@ -91,10 +92,10 @@ s3.push_str(" modified");  // Now allocates
 ```rust
 use std::mem::size_of;
 
-// All 24 bytes, but different inline capacities
+// Sizes on a 64-bit target; inline capacities and ownership strategies differ
 assert_eq!(size_of::<String>(), 24);
 assert_eq!(size_of::<compact_str::CompactString>(), 24);
-assert_eq!(size_of::<smartstring::SmartString>(), 24);
+assert_eq!(size_of::<smartstring::SmartString<smartstring::LazyCompact>>(), 24);
 assert_eq!(size_of::<ecow::EcoString>(), 16);  // Even smaller!
 ```
 
@@ -102,12 +103,12 @@ assert_eq!(size_of::<ecow::EcoString>(), 16);  // Even smaller!
 
 | Type | Size | Inline Capacity |
 |------|------|-----------------|
-| `String` | 24 | 0 (always heap) |
-| `CompactString` | 24 | 23 bytes [^1] |
+| `String` | 24 | 0 (empty strings need no heap allocation) |
+| `CompactString` | 24 | 24 bytes [^1] |
 | `SmartString<LazyCompact>` | 24 | 23 bytes |
 | `EcoString` | 16 | 15 bytes |
 
-[^1]: CompactString reserves the final byte of its 24-byte representation for a length tag, so the maximum inline string length is 23 bytes.
+[^1]: compact_str 0.9 uses the final byte to distinguish representations; a valid UTF-8 byte at full inline length also encodes the 24-byte case. It does not always reserve a separate tag byte. The corresponding compact_str / smartstring inline capacities on 32-bit targets are 12 / 11 bytes.
 
 ## When to Use
 

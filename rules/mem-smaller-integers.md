@@ -69,31 +69,39 @@ struct GeoPoint {
 
 ## Struct Packing
 
+`repr(Rust)` does not guarantee declaration order: the compiler may reorder fields, so measure its actual layout. The following **x86-64 `repr(C)`** example fixes field order to demonstrate padding; those byte counts are not a portable claim for every target.
+
 ```rust
 use std::mem::size_of;
 
 // Poor ordering - 24 bytes due to padding
+#[repr(C)]
 struct Wasteful {
     a: u8,    // 1 byte + 7 padding
     b: u64,   // 8 bytes
     c: u8,    // 1 byte + 7 padding
 }
+#[cfg(target_arch = "x86_64")]
 assert_eq!(size_of::<Wasteful>(), 24);
 
 // Better ordering - 16 bytes
+#[repr(C)]
 struct Efficient {
     b: u64,   // 8 bytes (aligned)
     a: u8,    // 1 byte
     c: u8,    // 1 byte + 6 padding
 }
+#[cfg(target_arch = "x86_64")]
 assert_eq!(size_of::<Efficient>(), 16);
 
-// Even better with smaller types - 10 bytes
+// Smaller types, when the value range permits them - 8 bytes on this target
+#[repr(C)]
 struct Compact {
     b: u32,   // 4 bytes (if u32 suffices)
     a: u8,    // 1 byte
     c: u8,    // 1 byte
 }
+#[cfg(target_arch = "x86_64")]
 assert_eq!(size_of::<Compact>(), 8);  // With padding
 ```
 

@@ -20,10 +20,10 @@ Or in `Cargo.toml`:
 suspicious = "warn"
 ```
 
-Or in `clippy.toml`:
+`clippy.toml` configures lint parameters, not lint levels. Use the manifest, source attributes, or command-line flags for levels:
 
-```toml
-warn = ["clippy::suspicious"]
+```bash
+cargo clippy -- -W clippy::suspicious
 ```
 
 ## What It Catches

@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Arena allocators (bump allocators) allocate memory from a contiguous region, making allocation extremely fast (just bump a pointer). All allocations are freed at once when the arena is dropped. Perfect for request-scoped or parse-tree allocations.
+Arena allocators serve allocations from reusable chunks; the common fast path advances a pointer. They can suit request-scoped or parse-tree data. Dropping a `bumpalo::Bump` frees its chunks, but does **not** run destructors for values placed with `Bump::alloc`. A `String`, standard `Vec`, file or other owning resource stored that way needs separate destruction; freeing the arena alone would leak its owned resources.
 
 ## Bad
 
@@ -33,27 +33,41 @@ fn handle_request(req: Request) -> Response {
 ```rust
 use bumpalo::Bump;
 
-// All nodes allocated from same arena
-fn parse<'a>(input: &str, arena: &'a Bump) -> Vec<&'a Node> {
-    let mut nodes = Vec::new();
-    for token in tokenize(input) {
-        let node = arena.alloc(Node::new(token));  // Fast bump!
-        nodes.push(node);
-    }
-    nodes
-}  // Arena freed all at once
+// Node contains only an arena-backed reference, with no destructor to run.
+struct Node<'a> {
+    text: &'a str,
+}
+
+fn parse<'a>(input: &str, arena: &'a Bump) -> Vec<&'a Node<'a>> {
+    input.split_whitespace().map(|token| {
+        let text = arena.alloc_str(token);
+        let node: &'a Node<'a> = arena.alloc(Node { text });
+        node
+    }).collect()
+}
 
 // Per-request arena
-fn handle_request(req: Request) -> Response {
+fn handle_request(input: &str) -> String {
     let arena = Bump::new();
     
-    let headers = parse_headers(&req, &arena);
-    let body = parse_body(&req, &arena);
-    let response = generate_response(&arena);
-    
-    // Convert to owned response before arena drops
-    response.to_owned()
-}  // All request memory freed instantly
+    let nodes = parse(input, &arena);
+    // Return an owned response. The outer Vec drops normally; node and text
+    // storage is reclaimed with the arena, without needing per-node Drop.
+    nodes.iter().map(|node| node.text).collect::<Vec<_>>().join(" ")
+}
+```
+
+For a value that needs `Drop`, keep a drop-owning wrapper outside raw arena storage. Enable the `boxed` feature for this example:
+
+```rust
+use bumpalo::{boxed::Box as BumpBox, Bump};
+
+let arena = Bump::new();
+{
+    let text = BumpBox::new_in(String::from("owned heap buffer"), &arena);
+    assert_eq!(text.as_str(), "owned heap buffer");
+} // BumpBox drops String, releasing its separate heap allocation.
+// The arena still owns the backing storage for the String object itself.
 ```
 
 ## Thread-Local Scratch Arena Pattern
@@ -66,36 +80,35 @@ thread_local! {
     static SCRATCH: RefCell<Bump> = RefCell::new(Bump::with_capacity(4 * 1024));
 }
 
-fn with_scratch<T>(f: impl FnOnce(&Bump) -> T) -> T {
+// T is independent of the arena borrow: arena references cannot escape.
+fn with_scratch<T>(f: impl for<'a> FnOnce(&'a Bump) -> T) -> T {
     SCRATCH.with(|scratch| {
-        let arena = scratch.borrow();
-        let result = f(&arena);
-        result
+        let mut arena = scratch.borrow_mut();
+        struct Reset<'a>(&'a mut Bump);
+        impl Drop for Reset<'_> {
+            fn drop(&mut self) {
+                self.0.reset();
+            }
+        }
+        let reset = Reset(&mut arena);
+        f(&*reset.0)
+        // Reset runs after the callback, also during unwinding.
     })
-}
-
-fn reset_scratch() {
-    SCRATCH.with(|scratch| {
-        scratch.borrow_mut().reset();
-    });
 }
 
 // Usage
-fn process_batch(items: &[Item]) -> Vec<Output> {
+fn process_batch(items: &[u64]) -> Vec<u64> {
     with_scratch(|arena| {
-        let temp_data: Vec<&TempData> = items
-            .iter()
-            .map(|item| arena.alloc(compute_temp(item)))
-            .collect();
-        
-        // Use temp_data...
-        let result = finalize(&temp_data);
-        
-        reset_scratch();  // Reuse arena memory
-        result
+        let temp_data = arena.alloc_slice_copy(items);
+        for item in temp_data.iter_mut() {
+            *item = item.saturating_mul(2);
+        }
+        temp_data.to_vec() // owned result; does not borrow scratch storage
     })
 }
 ```
+
+This helper is deliberately non-reentrant: recursively calling `with_scratch` on the same thread panics at `borrow_mut`. Use a separate arena if nested calls are needed. Reset during unwinding reclaims arena chunks, but does not run destructors of raw arena-allocated values; the same ownership restrictions still apply. Aborting the process does not run this cleanup.
 
 ## Evidence from ROC Compiler
 
@@ -118,6 +131,8 @@ fn put_scratchpad(scratchpad: bumpalo::Bump) {
 ```
 
 ## Bumpalo Collections
+
+These examples require `bumpalo = { version = "3", features = ["boxed", "collections"] }`. Keep owning collection/box wrappers in normal drop scopes when their elements need destruction; allocating the wrapper itself through raw `Bump::alloc` would again skip its destructor.
 
 ```rust
 use bumpalo::Bump;
@@ -150,18 +165,18 @@ fn process<'a>(arena: &'a Bump, input: &str) -> Vec<'a, String<'a>> {
 
 ## Performance Impact
 
-Arena/bump allocation removes per-allocation metadata overhead and can be
-substantially faster than the global allocator — often an order of magnitude in
-microbenchmarks — but the actual speedup depends on the allocator, workload,
-and allocation size. Arena reset is O(1) regardless of how many allocations
-were made. Measure with [criterion](https://crates.io/crates/criterion) to
-confirm the benefit in your specific use case.
+Arena allocation can reduce per-object allocator work; measure the effect for
+the actual allocator, workload and allocation sizes. In bumpalo 3.20.3, reset
+retains one chunk and walks/deallocates the other chunks. It has no per-object
+destructor loop, but its cost can grow with the number of chunks and the cost
+of deallocation. Measure reset latency as well as allocation throughput.
 
 ```rust
 // Memory trade-off:
 // - Arena wastes some memory (unused capacity at the end)
 // - But eliminates per-allocation metadata overhead
-// - Frees everything in O(1) with a single bump reset
+// - Reset reclaims arena storage, with work for additional chunks
+// - Raw arena allocation does not register destructors for owned resources
 ```
 
 ## See Also

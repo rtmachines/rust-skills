@@ -82,7 +82,7 @@ let result = xor_block([0u8; BLOCK], [0xFF; BLOCK]);
 
 ## Notes
 
-Rust 1.65+ stabilized const generic defaults (`struct Buf<const N: usize = 64>`), letting you provide a sensible default while still allowing callers to override it. Const generics currently support integer, bool, and char types; floating-point and custom types are not yet stable. Where N can be inferred from a function argument, you rarely need to write it explicitly.
+Minimal const generics stabilized in Rust 1.51; Rust 1.59 added const generic defaults (`struct Buf<const N: usize = 64>`), letting you provide a sensible default while still allowing callers to override it. Const generics currently support integer, bool, and char types; floating-point and custom types are not yet stable. Where N can be inferred from a function argument, you rarely need to write it explicitly.
 
 ## See Also
 

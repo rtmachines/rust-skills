@@ -1,25 +1,43 @@
-# Rust Skills
+# Rust Skills — corrected edition
 
 ![rules](https://img.shields.io/badge/rules-265-blue)
 ![categories](https://img.shields.io/badge/categories-26-blue)
-![Rust](https://img.shields.io/badge/Rust-1.96%20%2F%202024%20edition-orange)
+![edition](https://img.shields.io/badge/edition-2024-orange)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-265 Rust rules your AI coding agent can use to write better code. Current for Rust 1.96 (2024 edition).
+265 Rust rules for use with an AI coding agent. This fork corrects the
+101 findings in the Polish review of upstream commit
+`fd2a861ab0406a4ac536a55274d14ea6fd1ca9c9`. It is based on upstream 1.5.1;
+the correction identifier is `1.5.1+local.1`.
+
+See [LOCAL_CHANGES.md](LOCAL_CHANGES.md) for the correction ledger, verification
+results and limitations. Examples use edition 2024 unless stated otherwise;
+individual APIs and dependencies may have additional version requirements.
+The targeted regression suite was run on Rust 1.99.0, with a separately selected
+nightly for portable SIMD. This is not a certification of the entire collection
+on Rust 1.96 or the legacy CI toolchain, Rust 1.95.0.
 
 Works with Claude Code, Cursor, Windsurf, Copilot, Codex, Aider, Zed, Amp, Cline, and pretty much any other agent that supports skills.
 
 ## Why
 
-Out of the box, coding agents write *average* Rust — they clone to dodge the borrow checker, `.unwrap()` everything, and reach for `Box<dyn Trait>` when `impl Trait` would do. These rules encode what expert Rust actually looks like: idiomatic, fast, and safe. Each rule is small and focused, so the agent pulls in only what's relevant to the code in front of it.
+These rules explain Rust patterns, tradeoffs and common failure modes. Each rule
+is small and focused, so an agent can read the material relevant to the task.
+Apply it with the project's edition, MSRV, API contracts and workload in mind;
+a priority label or a passing test does not establish safety or performance.
 
-## Install
+## Install this corrected edition
 
 ```bash
-npx add-skill leonardomso/rust-skills
+npx add-skill rtmachines/rust-skills
 ```
 
-That's it. The CLI figures out which agents you have and installs the skill to the right place.
+Alternatively, point your agent at this directory's [SKILL.md](SKILL.md), or copy
+the directory into a skill location supported by your agent. Keep `rules/`
+alongside `SKILL.md`. Publishing this fork does not install it into any agent.
+
+The original project is [leonardomso/rust-skills](https://github.com/leonardomso/rust-skills).
+Installing from the original project does not include this fork's corrections.
 
 ## How to use it
 

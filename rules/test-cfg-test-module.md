@@ -4,15 +4,17 @@
 
 ## Why It Matters
 
-The `#[cfg(test)]` attribute ensures test code is only compiled during `cargo test`, not in release builds. Placing tests in a `tests` submodule within the same file keeps tests close to the code they test while maintaining separation. This is Rust's idiomatic unit test pattern.
+The `#[cfg(test)]` attribute excludes the whole test module, including helpers and imports, from ordinary builds. Functions marked `#[test]` are already test-only without it; `cargo test --release` still enables test code. Placing tests in a `tests` submodule within the same file keeps tests close to the code they test while maintaining separation. This is Rust's idiomatic unit test pattern.
 
 ## Bad
 
 ```rust
-// Tests without cfg(test) - compiled into release binary
+// Ungated helpers/imports are compiled in normal builds too.
 mod tests {
+    fn make_fixture() { /* test-only setup unnecessarily compiled */ }
+
     #[test]
-    fn test_something() { ... }  // Included in release build!
+    fn test_something() { ... }  // The #[test] function itself is test-only.
 }
 
 // Tests in separate file without access to private items

@@ -73,9 +73,9 @@ impl UserId {
         self.0
     }
     
-    // For database queries
-    pub fn as_i64(self) -> i64 {
-        self.0 as i64
+    // Reject IDs outside the signed database column's range.
+    pub fn try_to_i64(self) -> Result<i64, std::num::TryFromIntError> {
+        i64::try_from(self.0)
     }
 }
 

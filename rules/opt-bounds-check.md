@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Rust's safety guarantees require bounds checking on array/slice indexing. In tight loops, these checks can cause measurable overhead (branch mispredictions, preventing vectorization). Patterns like iterators, `get_unchecked`, and index splitting can eliminate these checks while maintaining safety.
+Safe array/slice indexing must reject an out-of-bounds access, but the compiler can eliminate a check when it proves the index is valid. Remaining checks can affect a hot loop. Iterators and slice splitting can make the proof easier; inspect generated code before considering `get_unchecked`, whose preconditions must hold for every legal call.
 
 ## Bad
 
@@ -12,7 +12,7 @@ Rust's safety guarantees require bounds checking on array/slice indexing. In tig
 fn sum_products(a: &[f64], b: &[f64]) -> f64 {
     let mut sum = 0.0;
     for i in 0..a.len() {
-        sum += a[i] * b[i];  // Two bounds checks per iteration
+        sum += a[i] * b[i];  // b may be too short; residual checks depend on optimization
     }
     sum
 }
@@ -29,7 +29,8 @@ fn apply_filter(data: &mut [u8], kernel: &[u8; 3]) {
 
 ```rust
 fn sum_products(a: &[f64], b: &[f64]) -> f64 {
-    // Iterator zips - no bounds checks, vectorizes well
+    assert_eq!(a.len(), b.len()); // zip alone would silently truncate
+    // Iterator traversal may help optimization; check the generated code.
     a.iter().zip(b.iter()).map(|(x, y)| x * y).sum()
 }
 
@@ -89,21 +90,24 @@ fn parallel_sum(data: &[i32]) -> i32 {
 
 ```rust
 fn matrix_multiply(a: &[f64], b: &[f64], c: &mut [f64], n: usize) {
-    assert!(a.len() >= n * n);
-    assert!(b.len() >= n * n);
-    assert!(c.len() >= n * n);
+    let area = n.checked_mul(n).expect("matrix dimensions overflow");
+    assert!(a.len() >= area);
+    assert!(b.len() >= area);
+    assert!(c.len() >= area);
     
     for i in 0..n {
         for j in 0..n {
             let mut sum = 0.0;
             for k in 0..n {
-                // SAFETY: bounds verified by asserts above
+                // SAFETY: area = n*n is representable. With i,j,k < n,
+                // both indices are < area and cannot overflow; the input
+                // slices have at least area initialized elements.
                 unsafe {
                     sum += a.get_unchecked(i * n + k) 
                          * b.get_unchecked(k * n + j);
                 }
             }
-            // SAFETY: bounds verified by asserts above
+            // SAFETY: i*n+j < area as above, and c has area elements.
             unsafe {
                 *c.get_unchecked_mut(i * n + j) = sum;
             }
@@ -158,6 +162,6 @@ fn get_config(&self, key: &str) -> Option<&Value> {
 
 ## See Also
 
-- [opt-simd-portable](./opt-simd-portable.md) - SIMD requires unchecked access
+- [opt-simd-portable](./opt-simd-portable.md) - SIMD loading with valid slice bounds
 - [opt-cache-friendly](./opt-cache-friendly.md) - Cache-efficient patterns
 - [perf-profile-first](./perf-profile-first.md) - Identify actual hot paths

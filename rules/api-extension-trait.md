@@ -111,6 +111,8 @@ let content = std::fs::read_to_string(path)
 // Extension only visible where imported
 mod string_utils {
     pub trait StringExt {
+        /// Truncates to at most `max_len` bytes, including the ASCII ellipsis.
+        /// Limits below three bytes use that many dots when truncation is needed.
         fn truncate_ellipsis(&self, max_len: usize) -> String;
     }
     
@@ -118,8 +120,14 @@ mod string_utils {
         fn truncate_ellipsis(&self, max_len: usize) -> String {
             if self.len() <= max_len {
                 self.to_string()
+            } else if max_len < 3 {
+                ".".repeat(max_len)
             } else {
-                format!("{}...", &self[..max_len.saturating_sub(3)])
+                let mut end = max_len - 3;
+                while !self.is_char_boundary(end) {
+                    end -= 1;
+                }
+                format!("{}...", &self[..end])
             }
         }
     }

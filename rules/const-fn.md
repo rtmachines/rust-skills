@@ -18,7 +18,7 @@ fn magic_mask() -> u32 {
     0xFF00_FF00
 }
 
-fn make_buf() -> [u8; 8] {
+fn make_buf() -> [u8; 4] {
     // runtime call — compiler cannot inline the length into the type
     [0u8; header_len()]  // error: `header_len` is not a `const fn`
 }
@@ -54,7 +54,7 @@ const ALIGNED: usize = align_up(13, 8); // 16, computed at compile time
 
 ## Notes
 
-Adding `const` to a function is a backwards-compatible, non-breaking change for library authors. Start with `const fn` for any pure function without heap allocation or dynamic dispatch; you can always remove it if you later need a capability that is not yet `const`-stable. Avoid `const fn` for functions that call unstable `const` features not yet stabilized on the channel you target.
+Adding `const` to a function permits existing runtime uses and enables new const-context uses. Public const-callability is then an API commitment: removing `const` breaks callers that use the function in constant expressions and requires a breaking release. Choose `const fn` when compile-time use is useful and you can maintain it. All operations in the body must be const-stable on the library's MSRV; needing a runtime-only operation later is not a reason to remove public `const` support in a compatible release.
 
 ## See Also
 

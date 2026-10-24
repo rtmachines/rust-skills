@@ -4,7 +4,7 @@
 
 ## Why It Matters
 
-Serde's default enum representation (externally tagged) wraps every variant in an object keyed by variant name. That format can clash with external APIs, event systems, or config schemas that use a discriminator field. Picking the wrong tagging strategy produces a mismatch between your wire format and the expected schema, leading to silent parse failures or round-trip data loss.
+Serde's default enum representation (externally tagged) usually wraps a data-carrying variant in an object keyed by variant name; in JSON, a unit variant is represented by its name as a string. That format can clash with external APIs, event systems, or config schemas that use a discriminator field. Picking the wrong tagging strategy produces a mismatch between your wire format and the expected schema, leading to silent parse failures or round-trip data loss.
 
 ## Bad
 
@@ -34,12 +34,13 @@ enum ShapeExternal {
 }
 
 // Internally tagged — {"type":"Circle","radius":5.0}
-// Good for: REST APIs with a discriminator field; all variants must be structs/maps
+// Good for: REST APIs with a discriminator field; supports struct and unit variants, plus newtypes wrapping structs/maps
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type")]
 enum ShapeInternal {
     Circle { radius: f64 },
     Rectangle { width: f64, height: f64 },
+    Empty, // unit variant: {"type":"Empty"}
 }
 
 // Adjacently tagged — {"t":"Circle","c":{"radius":5.0}}
@@ -76,7 +77,7 @@ enum Value {
 
 - **Untagged** deserializes by trying each variant in declaration order; it is slower, can silently pick the wrong variant, and produces generic error messages. Reserve it for small, structurally distinct sets (numbers vs strings).
 - **Internally tagged** cannot represent tuple variants or newtype variants wrapping primitives/vecs — use adjacently tagged instead.
-- All variants in an internally tagged enum must serialize as maps (structs or `HashMap`).
+- Internally tagged enums also support unit variants. Newtype payloads must support the tagged map representation (for example, a struct or `HashMap`); tuple variants and primitive/vector payloads do not.
 
 ## See Also
 

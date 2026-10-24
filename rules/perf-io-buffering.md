@@ -14,8 +14,9 @@ use std::io::{Read, Write};
 
 // Every read call goes to the OS — catastrophic for line-by-line processing
 fn count_lines_slow(path: &str) -> std::io::Result<usize> {
-    let file = File::open(path)?;
+    let mut file = File::open(path)?;
     let mut count = 0usize;
+    let mut partial_line = false;
     let mut byte = [0u8; 1];
     loop {
         match file.read(&mut byte) { // one syscall per byte
@@ -23,12 +24,16 @@ fn count_lines_slow(path: &str) -> std::io::Result<usize> {
             Ok(_) => {
                 if byte[0] == b'\n' {
                     count += 1;
+                    partial_line = false;
+                } else {
+                    partial_line = true;
                 }
             }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
         }
     }
-    Ok(count)
+    Ok(count + usize::from(partial_line))
 }
 
 // Writing many small records without buffering — each write is a syscall
@@ -48,13 +53,18 @@ fn write_records_slow(path: &str, records: &[String]) -> std::io::Result<()> {
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 
-// BufReader batches OS reads; lines() iterates safely without extra allocation per line
+// Count newline-delimited byte lines, including a final nonempty unterminated line.
+// BufReader batches OS reads; reuse the line buffer instead of lines()'s new String.
 fn count_lines_fast(path: &str) -> io::Result<usize> {
     let file = File::open(path)?;
-    let reader = BufReader::new(file);
+    let mut reader = BufReader::new(file);
+    let mut line = Vec::new();
     let mut count = 0usize;
-    for line in reader.lines() {
-        line?; // propagate IO errors
+    loop {
+        line.clear(); // Keeps capacity; a longer line may still require growth
+        if reader.read_until(b'\n', &mut line)? == 0 {
+            break;
+        }
         count += 1;
     }
     Ok(count)
@@ -88,7 +98,7 @@ fn process_large_file(path: &str) -> io::Result<()> {
 
 - `BufWriter::flush()?` must be called explicitly. When a `BufWriter` is dropped, it attempts to flush, but any resulting error is **silently discarded**. Always flush before the writer goes out of scope.
 - The default buffer size for both `BufReader` and `BufWriter` is 8 KiB. For sequential reads of large files, a larger buffer (32–512 KiB) can improve throughput by reducing the number of `read` syscalls further.
-- `BufReader` implements `BufRead`, which provides `lines()`, `read_line()`, and `read_until()` — use these instead of reading bytes manually.
+- `BufReader` implements `BufRead`. `lines()` creates an owned String per line and checks UTF-8; it does not reuse a single String. For repeated reading, use `read_line()` with a cleared String or `read_until()` with a cleared Vec when byte lines are the contract. If only counting delimiters in potentially huge lines, scan `fill_buf()` chunks instead of storing each whole line.
 - Network streams (`TcpStream`, etc.) benefit equally from buffering, since each `write` on an unbuffered stream may send a tiny TCP segment.
 - If you wrap a type that is already internally buffered (e.g., `tokio::io::BufWriter` in async code), adding another layer is redundant.
 
